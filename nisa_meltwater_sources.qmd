@@ -1,5 +1,5 @@
 ---
-title: "Meltwater source regions and the Glas δ¹⁸O record: importance, variability and alignment"
+title: "Meltwater source regions and abrupt δ¹⁸O changes in stalagmite Glas: importance, variability and age-uncertain alignment"
 author: "Laura Endres"
 date: today
 format:
@@ -14,590 +14,1214 @@ execute:
 
 ```{r}
 #| label: setup
-library(readr)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(patchwork)
-set.seed(20260929)
+suppressPackageStartupMessages({
+  library(readr); library(dplyr); library(tidyr); library(purrr)
+  library(ggplot2); library(patchwork); library(strucchange); library(Bchron)
+})
+dat <- function(f) read_csv(file.path("data", f), show_col_types = FALSE, name_repair = "unique_quiet")
 
-dat <- function(f) read_csv(file.path("data", f), show_col_types = FALSE)
+fmt  <- function(x, d = 2) formatC(x, format = "f", digits = d, big.mark = ",")
+ka   <- function(x, d = 1) formatC(x / 1000, format = "f", digits = d)
+fmtp <- function(p) ifelse(p < 0.001, "< 0.001", sprintf("%.3f", p))
+rng  <- function(x, d = 2) paste0(fmt(quantile(x, 0.05), d), " to ", fmt(quantile(x, 0.95), d))
 
-# Region codes used in the discharge files, in file order, mapped to the
-# input-region names and surface volumes of Endres et al. (2026b, Tables 1-2).
+# Region colours: the paper figures' colours (Endres et al. 2026b, Fig. 2a),
+# lightness-tuned to pass colour-vision checks; identical to app/template.html.
+reg_col <- c(EIS_MedSea = "#1f77b4", EIS_BayOfBiscay = "#f1780b", EIS_NorwegianSea = "#2ca02c",
+             EIS_Arctic = "#d62728", LAU_Arctic = "#9467bd", GIS_GreenlandSea = "#9b4c3c",
+             LAU_LabradorSea = "#de72bd", LAU_StLawrence = "#a5a608", LAU_GulfOfMexico = "#00b3c3")
+# Stacking order (bottom to top) that keeps neighbouring colours distinguishable
+stack_order <- c("EIS_BayOfBiscay", "LAU_LabradorSea", "LAU_StLawrence", "LAU_GulfOfMexico",
+                 "EIS_Arctic", "EIS_MedSea", "EIS_NorwegianSea", "LAU_Arctic", "GIS_GreenlandSea")
+col_fresh <- "#2a78d6"; col_resal <- "#eb6834"; ink2 <- "grey35"
+theme_ms <- theme_bw(base_size = 9) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major = element_line(linewidth = 0.2, colour = "grey90"),
+        strip.background = element_blank(), strip.text = element_text(face = "bold", hjust = 0))
+```
+
+```{r}
+#| label: data
 regions <- tribble(
-  ~code,      ~name,               ~ice,         ~V,
-  "Med",      "EIS_MedSea",        "European",   1.79e13,
-  "Bri",      "EIS_BayOfBiscay",   "European",   4.92e12,
-  "Fen",      "EIS_NorwegianSea",  "European",   5.85e12,
-  "EurArc",   "EIS_Arctic",        "European",   7.02e12,
-  "AmeArc",   "LAU_Arctic",        "Laurentide", 1.34e13,
-  "GIS",      "GIS_GreenlandSea",  "Greenland",  4.49e12,
-  "NLau",     "LAU_LabradorSea",   "Laurentide", 1.33e13,
-  "SLau",     "LAU_StLawrence",    "Laurentide", 1.58e13,
-  "GulofMex", "LAU_GulfOfMexico",  "Laurentide", 1.19e13
-)
-d18O_ice <- -35   # end-member used for the main analysis
+  ~code,      ~region,             ~ice,
+  "Med",      "EIS_MedSea",        "European",
+  "Bri",      "EIS_BayOfBiscay",   "European",
+  "Fen",      "EIS_NorwegianSea",  "European",
+  "EurArc",   "EIS_Arctic",        "European",
+  "AmeArc",   "LAU_Arctic",        "Laurentide",
+  "GIS",      "GIS_GreenlandSea",  "Greenland",
+  "NLau",     "LAU_LabradorSea",   "Laurentide",
+  "SLau",     "LAU_StLawrence",    "Laurentide",
+  "GulofMex", "LAU_GulfOfMexico",  "Laurentide")
+em <- -35   # ice-sheet end-member (per mil) used throughout
 
 tidy_discharge <- function(d, tcol, qprefix, recon) {
   d <- d |> mutate(age = -.data[[tcol]])
   q <- d |> select(age, all_of(paste0(qprefix, regions$code))) |>
     rename_with(~ sub(paste0("^", qprefix), "", .x)) |>
     pivot_longer(-age, names_to = "code", values_to = "Q")
-  a <- d |> select(age, ends_with(sprintf("(%.1f)", d18O_ice))) |>
+  a <- d |> select(age, ends_with(sprintf("(%.1f)", em))) |>
     pivot_longer(-age, names_to = "col", values_to = "anom") |>
     mutate(code = sub(" d18O.*$", "", col)) |> select(-col)
   inner_join(q, a, by = c("age", "code")) |> mutate(recon = recon)
 }
-glac <- tidy_discharge(dat("Discharge_Glac1d_regional-withd18O.csv"), "time", "", "GLAC-1D")
-ice6 <- tidy_discharge(dat("Discharge_ice6g_regional-withd18O.csv"), "t_adj", "discharge_", "ICE-6G")
-long <- bind_rows(glac, ice6) |> left_join(regions, by = "code") |>
-  mutate(name = factor(name, levels = regions$name),
+long <- bind_rows(
+  tidy_discharge(dat("Discharge_Glac1d_regional-withd18O.csv"), "time", "", "GLAC-1D"),
+  tidy_discharge(dat("Discharge_ice6g_regional-withd18O.csv"), "t_adj", "discharge_", "ICE-6G")) |>
+  left_join(regions, by = "code") |>
+  mutate(region = factor(region, levels = regions$region),
          recon = factor(recon, levels = c("GLAC-1D", "ICE-6G")))
 step <- c("GLAC-1D" = 100, "ICE-6G" = 500)
 
-# Glas (entity 903) on its original chronology
+# Sanity checks: anomaly/discharge ratio constant within each region; MWP-1A timing
+ratio_cv <- long |> filter(Q > 1e-5) |> group_by(recon, region) |>
+  summarise(cv = sd(anom / Q) / abs(mean(anom / Q)), .groups = "drop")
+tot <- long |> group_by(recon, age) |> summarise(tot = sum(anom), Q = sum(Q), .groups = "drop")
+mwp <- tot |> group_by(recon) |> slice_max(Q, n = 1) |> ungroup()
+
+# Glas (entity 903) on the published chronology, depth-ordered
 entity <- dat("entity.csv") |> filter(entity_name == "Glas")
 glas <- dat("sample.csv") |> filter(entity_id == entity$entity_id) |>
   inner_join(dat("original_chronology.csv"), by = "sample_id") |>
   inner_join(dat("d18O.csv"), by = "sample_id") |>
-  arrange(interp_age)
+  arrange(depth_sample)
+dates <- dat("dating.csv") |> filter(entity_id == entity$entity_id) |> arrange(depth_dating)
 win <- range(glas$interp_age)
+steps_g <- diff(sort(glas$interp_age))
 
-# Scaling check: anomaly / (Q * d18O_ice) per region, times region volume
-scal <- long |> filter(Q > 1e-6) |>
-  group_by(recon, name, V) |>
-  summarise(k = median(anom / (Q * d18O_ice)), .groups = "drop") |>
-  mutate(kV = k * V)
-
-fmt  <- function(x, d = 2) formatC(x, format = "f", digits = d, big.mark = ",")
-ka   <- function(x) sprintf("%.1f", x / 1000)
-fmtp <- function(p) ifelse(p < 0.001, "< 0.001", sprintf("%.3f", p))
+# Transport weights from source region to proxy site (Endres et al. 2026b)
+wts <- dat("meltmodel_site_weights.csv")
+# Linear vs saturating conversion: for anomaly L (linear) and end-member em, the
+# mixing-fraction anomaly is L / (1 + L / em), so the linear value is larger by |L| / |em|
+max_sat <- max(abs(long$anom)) / abs(em)
 ```
 
-# Questions
+```{r}
+#| label: bchron
+#| results: hide
+# Age-model ensemble: Bchron on the U-Th dates, predicted at the sample depths
+set.seed(20260929)
+bch <- Bchronology(ages = dates$corr_age, ageSds = dates$corr_age_uncert_pos,
+                   positions = dates$depth_dating, positionThicknesses = rep(0, nrow(dates)),
+                   calCurves = rep("normal", nrow(dates)),
+                   predictPositions = glas$depth_sample,
+                   iterations = 12000, burn = 2000, thin = 10)
+A <- bch$thetaPredict                           # N draws x 532 samples (depth order)
+N <- nrow(A)
+ens_med <- apply(A, 2, median)
+ens_q   <- apply(A, 2, quantile, c(0.025, 0.05, 0.95, 0.975))
+dev     <- ens_med - glas$interp_age
+hw_ens  <- (ens_q["97.5%", ] - ens_q["2.5%", ]) / 2
+hw_pub  <- (glas$interp_age_uncert_pos + glas$interp_age_uncert_neg) / 2
+set.seed(20260930)
+```
 
-At the NISA location, which meltwater source region is the most important, and
-which is the most variable, contributor to the δ¹⁸O anomaly over time? Is
-there alignment between abrupt δ¹⁸O changes in the Glas data and the modelled
-discharge, and how can that alignment be quantified?
+# Question
+
+At the NISA location, which meltwater source region is the most important,
+and which the most variable, contributor to the δ¹⁸O anomaly over time? Is
+there alignment between abrupt δ¹⁸O changes in stalagmite Glas and the
+modelled discharge, and how can that alignment be quantified?
 
 # Data
 
-**Discharge series.** `data/Discharge_Glac1d_regional-withd18O.csv` and
-`data/Discharge_ice6g_regional-withd18O.csv` are the meltwater forcing series
-of the impulse-response (Green's function) forward model of Endres et al.
-(in prep.; `Impulse_Response_Revisions_v1.pdf` in this repository, Sect. 5.2.3
-and 5.3.3). They give river-routed meltwater discharge (in Sv) into nine
-North Atlantic dye-tracer source regions, computed from the GLAC-1D
-reconstruction (`r fmt(max(glac$age)/1000, 0)`–`r fmt(abs(min(glac$age))/1000, 0)` ka,
-`r step["GLAC-1D"]`-yr steps) and the ICE-6G reconstruction
-(`r fmt(max(ice6$age)/1000, 0)` ka to `r fmt(abs(min(ice6$age))/1000, 0)` ka after
-present, `r step["ICE-6G"]`-yr steps), following the meltwater protocol
-described in the draft (after Ivanovic et al., 2018, and Romé et al., 2022,
-as cited there). Time is taken as years BP
-(negated `time` and `t_adj`); both series place their largest pulse at
-`r ka(glac |> group_by(age) |> summarise(Q = sum(Q)) |> slice_max(Q, n = 1) |> pull(age))`
-(GLAC-1D) and
-`r ka(ice6 |> group_by(age) |> summarise(Q = sum(Q)) |> slice_max(Q, n = 1) |> pull(age))`
-ka (ICE-6G), i.e. Meltwater Pulse 1A, which supports this convention. The
-region codes are those of the forward-model draft (Med, Bri, Fen, EurArc,
-AmeArc, GIS, NLau, SLau, GoM) and correspond, in the same order, to the
-input regions of Endres et al. (2026b) (@tbl-regions). Each file also gives
-the discharge converted to a δ¹⁸O anomaly per region for three ice-sheet
-end-members (−30, −35, −40 ‰); this is the forcing that the forward model
-convolves with the site kernels. Within every region the anomaly is a fixed
-multiple of the discharge, and that multiple, times the region's surface
-volume from Endres et al. (2026b), is the same constant for all nine regions
-(`r fmt(mean(scal$kV)/1e13, 2)` ± `r fmt(sd(scal$kV)/1e13, 2)` × 10¹³ m³ s⁻¹ yr,
-@tbl-regions), equal to one year of discharge. The anomaly columns are thus
-the surface δ¹⁸O anomaly of the *source region* per year of injection,
-Δδ¹⁸O = Q · 1 yr · δ¹⁸O~ice~ / V~region~, before propagation to NISA. The
-convolved anomaly at the NISA site (Fig. 5.13C, E of the draft) is not part
-of the repository data, so "contribution at NISA" is evaluated here on the
-forcing side. All results below use the −35 ‰ end-member; the other
-end-members rescale every anomaly by 6/7 or 8/7 and cannot change any
-ranking, correlation or event timing.
+**Discharge forcing.** `data/Discharge_Glac1d_regional-withd18O.csv` and
+`data/Discharge_ice6g_regional-withd18O.csv` give river-routed meltwater
+discharge (Sv) into nine North Atlantic dye-tracer source regions, derived
+from the GLAC-1D (`r ka(max(long$age[long$recon == "GLAC-1D"]), 0)`–0 ka,
+`r step[1]`-yr steps) and ICE-6G (`r ka(max(long$age[long$recon == "ICE-6G"]), 0)`
+ka to `r ka(-min(long$age[long$recon == "ICE-6G"]), 0)` ka after present,
+`r step[2]`-yr steps) ice-sheet reconstructions. They are the forcing of the
+impulse-response (Green's function) forward model of Endres et al. (in prep.,
+Sect. 5.2.3 and 5.3.5). Each file also gives the discharge converted to a
+source-region δ¹⁸O anomaly for three ice-sheet end-members. Time is read as
+years BP (negated `time` and `t_adj`). The total discharge peaks at
+`r ka(mwp$age[1])` ka in GLAC-1D and `r ka(mwp$age[2])` ka in ICE-6G, the
+Meltwater Pulse 1A interval, which confirms this convention. Within every
+region the anomaly is a fixed multiple of the discharge (coefficient of
+variation of the ratio ≤ `r fmt(100 * max(ratio_cv$cv), 1)` %), so the anomaly
+is the discharge divided by the region's surface volume and scaled to the
+end-member. The region codes map, in file order, to the input regions of
+Endres et al. (2026b): EIS_MedSea, EIS_BayOfBiscay, EIS_NorwegianSea,
+EIS_Arctic, LAU_Arctic, GIS_GreenlandSea, LAU_LabradorSea, LAU_StLawrence and
+LAU_GulfOfMexico. All results use the −35 ‰ end-member. The −30 and −40 ‰
+end-members rescale every anomaly by the same factor and change no ranking,
+correlation or event timing.
 
-**Glas.** Entity `r entity$entity_id` (La Vallina cave, NISA), `r nrow(glas)`
-δ¹⁸O samples on the original Bchron chronology, `r ka(win[1])`–`r ka(win[2])`
-ka BP (see the companion manuscript on the Glas age range). Abrupt δ¹⁸O
-transitions identified by Endres et al. (2026a, Table 1) are used as
-reference events.
+The convolved anomaly at NISA (Endres et al., in prep., Fig. 5.13 C and E) is
+not in the repository, and neither are the impulse-response kernels.
+"Contribution at NISA" is therefore evaluated in two ways. On the *forcing
+side*, the regions' source anomalies are compared before any ocean transport.
+At the *proxy sites*, each source anomaly is weighted by the fraction of it
+that reaches the site, using the transport weights of Endres et al. (2026b).
 
-```{r}
-#| label: tbl-regions
-#| tbl-cap: "Source-region codes in the discharge files, the corresponding input regions of Endres et al. (2026b), their surface volume V, and the empirical scaling k = anomaly / (Q · δ¹⁸O_ice) in the GLAC-1D file. k · V is constant, showing that the anomaly is the source-region anomaly per year of discharge."
-scal |> filter(recon == "GLAC-1D") |>
-  left_join(regions |> select(name, code, ice), by = "name") |>
-  transmute(Code = code, `Input region` = as.character(name), `Ice sheet` = ice,
-            `V (10¹² m³)` = fmt(V / 1e12, 2),
-            `k (‰ Sv⁻¹ ‰⁻¹)` = fmt(k, 2),
-            `k·V (10¹³)` = fmt(kV / 1e13, 2)) |>
-  knitr::kable()
-```
+**Proxy sites and transport weights.** Endres et al. (2026b) evaluate ten
+proxy sites. Nine of them have the information needed here (@tbl-sites):
+six marine sediment cores, the NISA cave (La Vallina), Cave Without a Name
+and the NGRIP ice core. Llarga Cave has no moisture-uptake mask and is also
+absent from their Fig. 7. For each site, source region and AMOC mode (cold
+and zonal), the paper gives the fraction of the source-region δ¹⁸O anomaly
+that reaches the site after 500 yr of constant input. For land sites the
+ocean anomaly is weighted by the site's moisture-uptake area. These weights
+were taken from the paper's figure data
+(`data/meltmodel_site_weights.csv`; provenance in
+`data/meltmodel_site_weights.md`). They range from
+`r fmt(min(wts$weight), 4)` to `r fmt(max(wts$weight), 3)`, so a site sees
+at most about `r fmt(100 * max(wts$weight), 0)` % of a region's source anomaly.
+
+**Glas.** Entity `r entity$entity_id` (La Vallina cave, NISA) has
+`r nrow(glas)` δ¹⁸O samples between `r fmt(min(glas$depth_sample), 1)` and
+`r fmt(max(glas$depth_sample), 1)` mm depth, dated to
+`r ka(win[1])`–`r ka(win[2])` ka BP on the published Bchron chronology. The
+median sampling step is `r fmt(median(steps_g), 0)` yr (mean
+`r fmt(mean(steps_g), 0)` yr, maximum `r fmt(max(steps_g), 0)` yr), so Glas
+is sampled several times per 100-yr GLAC-1D step. The age model rests on
+`r nrow(dates)` U–Th dates (`r ka(min(dates$corr_age))`–`r ka(max(dates$corr_age))`
+ka, uncertainties `r fmt(min(dates$corr_age_uncert_pos), 0)`–`r fmt(max(dates$corr_age_uncert_pos), 0)` yr).
+The six abrupt δ¹⁸O transitions of Endres et al. (2026a, Table 1) are used as
+published reference events, located by their sample-depth intervals.
 
 # Methods
 
-**Importance and variability.** For each reconstruction the per-region
-anomaly series was summarised over the full series and over the Glas
-interval (`r ka(win[1])`–`r ka(win[2])` ka). *Importance* is the time-mean
-anomaly (equivalently the time-integrated contribution) and its share of the
-summed anomaly of all regions. *Variability* is the standard deviation of the
-anomaly over time; the coefficient of variation (SD / |mean|) is given as a
-scale-free complement. Because the anomaly is proportional to discharge, the
-same rankings hold for discharge itself.
+## Importance and variability of source regions
 
-**Alignment with Glas.** Glas δ¹⁸O was averaged into the time bins of each
-reconstruction (`r step["GLAC-1D"]` yr for GLAC-1D, `r step["ICE-6G"]` yr for
-ICE-6G). Three complementary quantifications were used:
+Each region's anomaly series was summarised over the Glas interval and over
+the full series. To keep resolution from masquerading as variability, the
+comparison between reconstructions uses a common 500-yr grid, with GLAC-1D
+averaged into the ICE-6G time steps. GLAC-1D is also summarised at its native
+100-yr resolution.
 
-1. *Correlation at lag 0* between binned Glas δ¹⁸O and the total and
-   per-region anomalies (Pearson r). A negative anomaly means fresher
-   surface water, and a negative Glas δ¹⁸O shift is read as freshening, so
-   alignment corresponds to positive r. Both series are strongly
-   autocorrelated, so significance was assessed against 2,000 AR(1)
-   surrogates of the Glas series with the same lag-1 autocorrelation.
-2. *Lead–lag cross-correlation* between binned Glas δ¹⁸O and the GLAC-1D
-   total anomaly for lags of ±2,000 yr, with the same surrogate envelope.
-3. *Event matching.* Discharge pulses were defined on the GLAC-1D total
-   anomaly as `r step["GLAC-1D"]`-yr steps whose change exceeds one standard
-   deviation of all steps (freshening pulses: anomaly becoming more negative;
-   recoveries: anomaly becoming less negative), merging consecutive steps
-   into one pulse at the largest step. Glas events are the six δ¹⁸O
-   transitions of Endres et al. (2026a, Table 1), plus data-driven steps
-   where the change between consecutive `r step["GLAC-1D"]`-yr bins exceeds
-   two standard deviations. A Glas event is matched if a discharge pulse of
-   the same sign lies within ±300 yr. The number of matches was compared
-   with 5,000 random placements of the same events in the Glas interval.
+- **Importance** is the time-mean anomaly and the region's share of the summed
+  anomaly of all regions. The *dominance fraction* is the share of time steps
+  in which the region is the single largest contributor.
+- **Variability** is the temporal standard deviation (SD) of the anomaly. The
+  *variance share*, Cov(anomalyᵢ, total) / Var(total), apportions the
+  variance of the total anomaly to the regions and sums to one. The SD of
+  step-to-step changes measures abruptness.
+
+**Anomaly at the proxy sites.** The anomaly at a site is approximated as the
+weighted sum of the source anomalies, A~site~(t) = Σ~regions~ w~site,region~ ·
+A~region~(t), separately for the cold and the zonal AMOC mode. This is the
+equilibrium limit of the forward-model convolution. It applies the 500-yr
+response to every time step at once and ignores transit times of years to
+centuries. Slow changes are therefore represented about right, but short
+pulses are overstated and appear without delay. The source anomalies are
+those of the discharge files, which are linear in discharge and are what the
+forward-model draft convolves. Endres et al. (2026b) instead use a mixing
+fraction that saturates for large inputs, so for the largest pulse in these
+series the linear anomaly is up to `r fmt(100 * max_sat, 0)` % larger. The
+same importance and variability metrics as above are then computed for the
+contributions at NISA.
+
+## Age uncertainty of Glas
+
+The published chronology is a single realisation. To propagate its
+uncertainty, Bchron (Haslett and Parnell, 2008) was rerun on the `r nrow(dates)`
+U–Th dates and evaluated at all sample depths, giving an ensemble of
+`r fmt(N, 0)` monotonic age models. Following Rehfeld and Kurths (2014), every
+alignment statistic below is computed for each ensemble member and reported
+as the median and the 5–95 % range. Glas events are defined by sample depth,
+not age, so each event is re-dated in every member. The discharge series have
+their own chronological uncertainty, which is not given in the repository.
+Its effect is bounded with a scan in which the discharge series is shifted by
+−1,000 to +1,000 yr.
+
+## Alignment of Glas with the discharge
+
+The sign convention is that negative source anomalies and negative Glas δ¹⁸O
+shifts both mean freshening, so alignment corresponds to positive correlation
+and to same-sign events.
+
+1. **Kernel cross-correlation.** Glas is irregularly sampled. Instead of
+   interpolating it, correlations were estimated with the Gaussian-kernel
+   estimator of Rehfeld et al. (2011) on the raw sample ages (bandwidth 25 yr;
+   results change by < 0.01 between 15 and 100 yr). Both series were
+   standardised within the Glas interval. The full series (*levels*) is
+   dominated by millennial variations and the shared deglacial trend. A
+   *high-pass* version isolates centennial variations: it is the residual
+   after subtracting a Gaussian smoother of 750 yr width. Cross-correlations
+   were computed for lags of ±2,000 yr against the total and the nine
+   regional anomalies of GLAC-1D.
+
+   *In plain terms:* the question is whether Glas δ¹⁸O is low when the
+   modelled meltwater anomaly is large, and whether one follows the other
+   with a delay. Glas samples are unevenly spaced, so instead of first
+   interpolating Glas onto a regular grid, every pair of a Glas value and a
+   discharge value contributes to the correlation with a weight that falls off
+   the further apart the two are in time. This is done twice. The first pass
+   uses the complete records, which mostly compares the slow deglacial trend.
+   The second pass first subtracts a running average (a 750-yr Gaussian) from
+   both records, so that only the fast, centennial wiggles remain, where
+   abrupt events show up. Finally, one record is shifted against the other in
+   100-yr steps, up to 2,000 yr in each direction, to see whether the
+   agreement improves when Glas leads or lags the discharge.
+2. **Significance.** Two nulls were used. The first uses 300 AR(1) surrogates
+   of Glas on its irregular times, with persistence estimated from the data
+   (Schulz and Mudelsee, 2002). The second uses 300 phase-randomised
+   surrogates of the discharge that keep its spectrum (Theiler et al., 1992).
+   For the lead–lag search, a *family-wise* p value compares the largest
+   |r| over all lags, and over all ten series, with the same maximum in the
+   surrogates. This accounts for testing many lags and regions (Franke and
+   Donner, 2019).
+3. **Event matching.** Discharge pulses are 100-yr changes in the GLAC-1D total
+   anomaly larger than k SD of all changes (k = 1, 1.5 and 2), split into
+   freshening pulses and recoveries; consecutive steps are merged. A Glas
+   event is matched if a same-sign pulse lies within a tolerance of ±200, 300
+   or 500 yr. For each event the ensemble gives a *match probability*, the
+   fraction of age models in which it is matched. The number of matches is
+   compared with 5,000 random placements of the same events in the Glas
+   interval.
+4. **Objective events.** To avoid relying only on published events,
+   mean-shift breakpoints were fitted to the 100-yr binned Glas δ¹⁸O
+   (Zeileis et al., 2002). Breakpoints were added only while the
+   reduction in residual variance exceeded the 95th percentile of the same
+   quantity in 200 AR(1) surrogates.
+5. **Superposed epoch analysis.** Glas δ¹⁸O was composited in 100-yr bins from
+   500 yr before to 1,000 yr after each GLAC-1D freshening pulse and each
+   recovery, relative to the pre-pulse mean. The response statistic is the
+   mean composite anomaly 100–600 yr after the pulse. The null places the same
+   number of pulses at random within the Glas interval, 2,000 times.
+6. **Detectability.** To judge what correlation *could* be expected, synthetic
+   Glas series were built as a mix of the high-passed GLAC-1D total anomaly
+   (signal) and AR(1) noise with the Glas persistence, for signal fractions of
+   the variance between 5 and 50 %.
+7. **ICE-6G.** At 500-yr resolution ICE-6G cannot resolve centennial events.
+   It was compared with 500-yr Glas means through level and first-difference
+   correlations only.
 
 # Results
 
 ## Importance and variability of source regions
 
 ```{r}
-#| label: summaries
+#| label: part-a
+g500 <- long |> filter(recon == "GLAC-1D") |> mutate(age = round(age / 500) * 500) |>
+  group_by(recon, age, code, region, ice) |> summarise(Q = mean(Q), anom = mean(anom), .groups = "drop")
+c500 <- bind_rows(g500, long |> filter(recon == "ICE-6G"))
 summ <- function(d) d |>
-  group_by(recon, ice, name) |>
-  summarise(mean = mean(anom), sd = sd(anom), min = min(anom), .groups = "drop") |>
-  group_by(recon) |>
-  mutate(share = 100 * mean / sum(mean), cv = sd / abs(mean)) |>
-  ungroup()
-s_full <- summ(long)
-s_win  <- summ(long |> filter(age >= win[1], age <= win[2]))
-top <- function(s, r, what) s |> filter(recon == r) |>
-  { \(x) if (what == "imp") slice_min(x, mean, n = 1) else slice_max(x, sd, n = 1) }()
-imp_g <- top(s_win, "GLAC-1D", "imp"); imp_i <- top(s_win, "ICE-6G", "imp")
-var_g <- top(s_win, "GLAC-1D", "var"); var_i <- top(s_win, "ICE-6G", "var")
-impf_g <- top(s_full, "GLAC-1D", "imp"); impf_i <- top(s_full, "ICE-6G", "imp")
-varf_g <- top(s_full, "GLAC-1D", "var"); varf_i <- top(s_full, "ICE-6G", "var")
+  group_by(recon, age) |> mutate(tot = sum(anom), dom = anom == min(anom)) |> ungroup() |>
+  arrange(recon, region, desc(age)) |> group_by(recon, region) |> mutate(dA = anom - lag(anom)) |> ungroup() |>
+  group_by(recon, ice, region) |>
+  summarise(mean = mean(anom), sd = sd(anom), min = min(anom), dom = mean(dom),
+            vshare = cov(anom, tot) / var(tot), sd_diff = sd(dA, na.rm = TRUE), .groups = "drop") |>
+  group_by(recon) |> mutate(share = mean / sum(mean)) |> ungroup()
+s_win    <- summ(c500 |> filter(age >= win[1], age <= win[2]))
+s_full   <- summ(c500)
+s_win100 <- summ(long |> filter(recon == "GLAC-1D", age >= win[1], age <= win[2]))
+pick <- function(s, r, v, f = which.max) { x <- s |> filter(recon == r); x[f(x[[v]]), ] }
+imp  <- function(s, r) pick(s, r, "share")
+var_ <- function(s, r) pick(s, r, "sd")
+vsh  <- function(s, r) pick(s, r, "vshare")
+top3 <- s_win |> filter(recon == "GLAC-1D") |> slice_max(share, n = 3)
 ice_share <- s_win |> group_by(recon, ice) |> summarise(share = sum(share), .groups = "drop")
-gs <- function(r, i) fmt(ice_share$share[ice_share$recon == r & ice_share$ice == i], 0)
+gs <- function(r, i) fmt(100 * ice_share$share[ice_share$recon == r & ice_share$ice == i], 0)
 ```
 
-@fig-stack shows the regional anomalies through time and @tbl-rank ranks the
-regions within the Glas interval. The two reconstructions disagree on the
-single most important region. In GLAC-1D the three largest contributors are
-nearly tied: **`r imp_g$name`** (mean `r fmt(imp_g$mean)` ‰,
-`r fmt(imp_g$share, 0)` % of the summed anomaly), followed by EIS_Arctic and
-LAU_Arctic, and the European sectors together supply `r gs("GLAC-1D", "European")` %
-of the anomaly versus `r gs("GLAC-1D", "Laurentide")` % from the Laurentide.
-In ICE-6G the most important region is **`r imp_i$name`**
-(mean `r fmt(imp_i$mean)` ‰, `r fmt(imp_i$share, 0)` %), and the Laurentide
-sectors dominate (`r gs("ICE-6G", "Laurentide")` % versus
-`r gs("ICE-6G", "European")` % European). Over the full series (@tbl-rankfull)
-the most important region is `r impf_g$name` in GLAC-1D and
-`r impf_i$name` in ICE-6G, because both reconstructions route most of
-Meltwater Pulse 1A and the Holocene melt through the Laurentide sectors.
+Within the Glas interval (@tbl-rank, @fig-stack), the two reconstructions
+disagree on the most important region.
 
-The most variable contribution over the Glas interval is
-**`r var_g$name`** in GLAC-1D (SD `r fmt(var_g$sd)` ‰, with EIS_Arctic almost
-equal) and **`r var_i$name`** in ICE-6G (SD `r fmt(var_i$sd)` ‰). In both
-reconstructions the variability is concentrated in a few short pulses rather
-than in a fluctuating background (@fig-stack): the regions with the largest SD
-also have the most negative single values (@tbl-rank). GIS_GreenlandSea and
-EIS_MedSea are negligible in GLAC-1D and small and steady in ICE-6G, so they
-are the least variable in both cases.
+- **GLAC-1D.** Three regions are almost tied: `r top3$region[1]`
+  (`r fmt(100 * top3$share[1], 1)` % of the summed anomaly),
+  `r top3$region[2]` (`r fmt(100 * top3$share[2], 1)` %) and `r top3$region[3]`
+  (`r fmt(100 * top3$share[3], 1)` %). European sectors supply
+  `r gs("GLAC-1D", "European")` % and Laurentide sectors
+  `r gs("GLAC-1D", "Laurentide")` %. `r pick(s_win, "GLAC-1D", "dom")$region`
+  is the largest single contributor most often
+  (`r fmt(100 * pick(s_win, "GLAC-1D", "dom")$dom, 0)` % of time steps),
+  because it dominates the Last Glacial Maximum while contributing little
+  afterwards.
+- **ICE-6G.** `r imp(s_win, "ICE-6G")$region` is the most important region
+  (`r fmt(100 * imp(s_win, "ICE-6G")$share, 1)` %), and Laurentide sectors
+  supply `r gs("ICE-6G", "Laurentide")` %.
+
+The most variable region is `r var_(s_win, "GLAC-1D")$region` in GLAC-1D
+(SD `r fmt(var_(s_win, "GLAC-1D")$sd)` ‰, variance share
+`r fmt(100 * vsh(s_win, "GLAC-1D")$vshare, 0)` %). In ICE-6G the largest SD
+belongs to `r var_(s_win, "ICE-6G")$region`
+(`r fmt(var_(s_win, "ICE-6G")$sd)` ‰), and `r vsh(s_win, "ICE-6G")$region`
+carries the largest variance share
+(`r fmt(100 * vsh(s_win, "ICE-6G")$vshare, 0)` %). At native 100-yr
+resolution, GLAC-1D gives the same answer: `r var_(s_win100, "GLAC-1D")$region`
+has the largest SD (`r fmt(var_(s_win100, "GLAC-1D")$sd)` ‰) and the largest
+variance share (`r fmt(100 * vsh(s_win100, "GLAC-1D")$vshare, 0)` %). The
+variability is carried by a few short pulses, so the most variable regions
+also reach the most negative single values. GIS_GreenlandSea and EIS_MedSea
+are negligible in GLAC-1D (< `r fmt(100 * max(s_win$share[s_win$recon == "GLAC-1D" & s_win$region %in% c("GIS_GreenlandSea", "EIS_MedSea")]), 1)` % each). In ICE-6G they
+contribute `r fmt(100 * min(s_win$share[s_win$recon == "ICE-6G" & s_win$region %in% c("GIS_GreenlandSea", "EIS_MedSea")]), 1)`–`r fmt(100 * max(s_win$share[s_win$recon == "ICE-6G" & s_win$region %in% c("GIS_GreenlandSea", "EIS_MedSea")]), 1)` %
+each, about as much as EIS_BayOfBiscay, but they vary little.
+
+Over the full series (@tbl-rankfull), `r imp(s_full, "GLAC-1D")$region` is the
+most important region in both GLAC-1D and ICE-6G, because both reconstructions
+route most of Meltwater Pulse 1A and the Holocene melt through Laurentide
+sectors.
+
+@fig-importance shows these shares directly. Within the Glas interval,
+GLAC-1D spreads the anomaly over many regions with a European majority, while
+ICE-6G concentrates it in the Laurentide sectors. Over the full series both
+reconstructions become Laurentide-dominated. @fig-radar compares all five
+metrics of @tbl-rank and @tbl-rankfull region by region.
 
 ```{r}
-#| label: fig-stack
-#| fig-cap: "Source-region δ¹⁸O anomalies (−35 ‰ end-member) through time for GLAC-1D (top) and ICE-6G (bottom), stacked so that the envelope is the summed anomaly of all nine regions. Grey shading marks the interval covered by Glas."
+#| label: fig-importance
+#| fig-cap: "Importance of the source regions: share of the summed source δ¹⁸O anomaly (500-yr grid, −35 ‰ end-member) within the Glas interval and over the full series. Regions are grouped by ice sheet (European, Greenland, Laurentide from left); labels give shares of at least 7 %, and the text at the right gives the European and Laurentide totals."
 #| fig-width: 7
-#| fig-height: 5.5
-ggplot(long, aes(age / 1000, anom, fill = name)) +
-  annotate("rect", xmin = win[1] / 1000, xmax = win[2] / 1000,
-           ymin = -Inf, ymax = Inf, fill = "grey85", alpha = 0.5) +
-  geom_area(position = "stack", colour = NA) +
-  facet_wrap(~recon, ncol = 1, scales = "free_y") +
-  scale_x_reverse(limits = c(28, -2)) +
-  scale_fill_viridis_d(name = NULL, option = "turbo") +
-  labs(x = "Age (ka BP)", y = expression(delta^18*O~anomaly~"(‰)")) +
-  theme_bw(base_size = 10) + theme(legend.position = "bottom") +
+#| fig-height: 3.4
+ice_order <- c("EIS_MedSea", "EIS_BayOfBiscay", "EIS_NorwegianSea", "EIS_Arctic", "GIS_GreenlandSea",
+               "LAU_Arctic", "LAU_LabradorSea", "LAU_StLawrence", "LAU_GulfOfMexico")
+imp_df <- bind_rows(s_win |> mutate(period = "Glas interval"), s_full |> mutate(period = "Full series")) |>
+  mutate(bar = factor(paste(recon, period, sep = " · "),
+                      levels = rev(c("GLAC-1D · Glas interval", "ICE-6G · Glas interval",
+                                     "GLAC-1D · Full series", "ICE-6G · Full series"))),
+         region = factor(as.character(region), levels = rev(ice_order))) |>
+  arrange(bar, desc(region)) |> group_by(bar) |>
+  mutate(xmax = cumsum(share), xmin = xmax - share, xmid = (xmin + xmax) / 2) |> ungroup()
+imp_ice <- imp_df |> group_by(bar, ice) |> summarise(share = sum(share), .groups = "drop") |>
+  pivot_wider(names_from = ice, values_from = share) |>
+  mutate(lab = sprintf("Eur %s %% · Lau %s %%", fmt(100 * European, 0), fmt(100 * Laurentide, 0)))
+ggplot(imp_df) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = as.numeric(bar) - 0.38, ymax = as.numeric(bar) + 0.38, fill = region),
+            colour = "white", linewidth = 0.4) +
+  geom_text(data = imp_df |> filter(share >= 0.07), aes(xmid, as.numeric(bar), label = fmt(100 * share, 0)),
+            size = 2.6, colour = "white", fontface = "bold") +
+  geom_text(data = imp_ice, aes(1.02, as.numeric(bar), label = lab), hjust = 0, size = 2.6, colour = "grey25") +
+  scale_y_continuous(breaks = seq_along(levels(imp_df$bar)), labels = levels(imp_df$bar), expand = expansion(add = 0.3)) +
+  scale_x_continuous(labels = function(x) paste0(100 * x, " %"), breaks = seq(0, 1, 0.25), expand = expansion(mult = c(0, 0))) +
+  coord_cartesian(xlim = c(0, 1.33), clip = "off") +
+  scale_fill_manual(values = reg_col, breaks = ice_order, name = NULL) +
+  labs(x = "Share of summed source anomaly", y = NULL) +
+  theme_ms + theme(legend.position = "bottom", panel.grid.major.y = element_blank(),
+                   plot.margin = margin(5, 10, 5, 5)) +
   guides(fill = guide_legend(nrow = 3))
 ```
 
 ```{r}
+#| label: fig-radar
+#| fig-cap: "Region profiles for the five metrics of Tables 1 and 2 (500-yr grid). Each spoke is scaled to the largest value of that metric over all regions, both reconstructions and both periods, so the outer ring is the maximum. Solid lines: Glas interval; dashed: full series. Negative variance shares are drawn at zero."
+#| fig-width: 7
+#| fig-height: 7
+metrics <- c(share = "Share", dom = "Dominant", sd = "SD", vshare = "Var. share", sd_diff = "SD Δ")
+rad <- bind_rows(s_win |> mutate(period = "Glas interval"), s_full |> mutate(period = "Full series")) |>
+  select(recon, period, region, all_of(names(metrics))) |>
+  pivot_longer(all_of(names(metrics)), names_to = "metric", values_to = "value") |>
+  mutate(value = pmax(value, 0)) |>
+  group_by(metric) |> mutate(r = value / max(value)) |> ungroup() |>
+  mutate(k = match(metric, names(metrics)), ang = pi / 2 - 2 * pi * (k - 1) / length(metrics),
+         x = r * cos(ang), y = r * sin(ang),
+         region = factor(as.character(region), levels = as.character(regions$region)),
+         period = factor(period, levels = c("Glas interval", "Full series"))) |>
+  arrange(recon, period, region, k)
+rad_closed <- rad |> group_by(recon, period, region) |> group_modify(~ bind_rows(.x, .x[1, ])) |> ungroup()
+spokes <- tibble(k = seq_along(metrics), ang = pi / 2 - 2 * pi * (k - 1) / length(metrics),
+                 x = cos(ang), y = sin(ang), lab = unname(metrics),
+                 lx = 1.28 * cos(ang), ly = 1.2 * sin(ang))
+rings <- expand_grid(r = c(0.5, 1), t = seq(0, 2 * pi, length.out = 73)) |> mutate(x = r * cos(t), y = r * sin(t))
+rec_col <- c("GLAC-1D" = "#184f95", "ICE-6G" = "#c26a00")
+ggplot() +
+  geom_path(data = rings, aes(x, y, group = r), colour = "grey85", linewidth = 0.3) +
+  geom_segment(data = spokes, aes(0, 0, xend = x, yend = y), colour = "grey85", linewidth = 0.3) +
+  geom_text(data = spokes, aes(lx, ly, label = lab), size = 2.3, colour = "grey35") +
+  geom_path(data = rad_closed, aes(x, y, colour = recon, linetype = period, group = interaction(recon, period)), linewidth = 0.6) +
+  facet_wrap(~region, ncol = 3) +
+  scale_colour_manual(values = rec_col, name = NULL) +
+  scale_linetype_manual(values = c("Glas interval" = "solid", "Full series" = "22"), name = NULL) +
+  coord_equal(xlim = c(-1.45, 1.45), ylim = c(-1.2, 1.3)) +
+  theme_void(base_size = 9) +
+  theme(strip.text = element_text(face = "bold", size = 8.5, margin = margin(b = 2)), legend.position = "bottom",
+        panel.spacing = unit(4, "pt"))
+```
+
+```{r}
+#| label: fig-stack
+#| fig-cap: "Source-region δ¹⁸O anomalies (−35 ‰ end-member) at native resolution, stacked so the lower envelope is the summed anomaly. Colours follow the region colours of Endres et al. (2026b). Grey shading marks the Glas interval."
+#| fig-width: 7
+#| fig-height: 5
+# geom_area stacks the first factor level on top, so reverse the bottom-to-top order
+stk <- long |> mutate(grp = factor(as.character(region), levels = rev(stack_order)))
+ggplot(stk, aes(age / 1000, anom, fill = grp)) +
+  annotate("rect", xmin = win[1] / 1000, xmax = win[2] / 1000, ymin = -Inf, ymax = Inf, fill = "grey92") +
+  geom_area(position = "stack", colour = NA) +
+  facet_wrap(~recon, ncol = 1, scales = "free_y") +
+  scale_x_reverse(limits = c(28, -2), breaks = seq(28, 0, -4)) +
+  scale_fill_manual(values = reg_col, breaks = as.character(regions$region), name = NULL) +
+  labs(x = "Age (ka BP)", y = expression("Source" ~ delta^18*O ~ "anomaly (‰)")) +
+  theme_ms + theme(legend.position = "bottom") + guides(fill = guide_legend(nrow = 3))
+```
+
+```{r}
 #| label: tbl-rank
-#| tbl-cap: "Source regions within the Glas interval, ranked by mean anomaly (importance). Share is the region's fraction of the summed anomaly; SD is the temporal standard deviation (variability) and CV = SD / |mean|. Values in ‰ for the −35 ‰ end-member."
-rank_tab <- function(s) s |> arrange(recon, mean) |>
-  transmute(Reconstruction = as.character(recon), Region = as.character(name),
-            `Mean (‰)` = fmt(mean), `Share (%)` = fmt(share, 1),
-            `Min (‰)` = fmt(min), `SD (‰)` = fmt(sd), CV = fmt(cv, 1)) |>
+#| tbl-cap: "Source regions within the Glas interval on the common 500-yr grid, ranked by importance. Share: fraction of the summed anomaly. Dominant: fraction of time steps in which the region is the largest contributor. SD: temporal standard deviation. Var. share: Cov(region, total)/Var(total). SD Δ: standard deviation of 500-yr changes."
+rank_tab <- function(s) s |> arrange(recon, desc(share)) |>
+  transmute(Reconstruction = as.character(recon), Region = as.character(region),
+            `Mean (‰)` = fmt(mean), `Share (%)` = fmt(100 * share, 1), `Dominant (%)` = fmt(100 * dom, 0),
+            `SD (‰)` = fmt(sd), `Var. share (%)` = fmt(100 * vshare, 0), `SD Δ (‰)` = fmt(sd_diff)) |>
   mutate(Reconstruction = ifelse(duplicated(Reconstruction), "", Reconstruction))
 knitr::kable(rank_tab(s_win))
 ```
 
 ```{r}
 #| label: tbl-rankfull
-#| tbl-cap: "As Table 2, but over the full length of each discharge series."
+#| tbl-cap: "As the previous table, but over the full length of each series."
 knitr::kable(rank_tab(s_full))
 ```
 
-## Alignment between Glas δ¹⁸O and discharge
+## Transport-weighted anomaly at the proxy sites
 
 ```{r}
-#| label: align-prep
-tot <- long |> group_by(recon, age) |>
-  summarise(tot = sum(anom), Q = sum(Q), .groups = "drop")
-bin_glas <- function(st) glas |>
-  mutate(age = round(interp_age / st) * st) |>
-  group_by(age) |> summarise(d18O = mean(d18O_measurement), n = n(), .groups = "drop")
-joined <- lapply(names(step), function(r) {
-  bin_glas(step[r]) |>
-    inner_join(long |> filter(recon == r) |> select(age, name, anom), by = "age") |>
-    inner_join(tot |> filter(recon == r) |> select(age, tot), by = "age") |>
-    mutate(recon = r)
-}) |> bind_rows()
-wide <- joined |> select(recon, age, d18O, tot, name, anom) |>
-  pivot_wider(names_from = name, values_from = anom) |>
-  arrange(recon, desc(age))   # old -> young within each reconstruction
-
-ar1_surrogates <- function(x, nsim = 2000) {
-  n <- length(x); phi <- cor(x[-1], x[-n])
-  m <- matrix(rnorm(n * nsim), n, nsim)
-  for (i in 2:n) m[i, ] <- phi * m[i - 1, ] + m[i, ]
-  list(phi = phi, sur = m)
-}
-lagcor <- function(x, y, k) {   # k > 0: y (discharge) leads x (Glas)
-  n <- length(x)
-  if (k >= 0) cor(x[(k + 1):n], y[1:(n - k)]) else cor(x[1:(n + k)], y[(1 - k):n])
-}
-cor_table <- function(r) {
-  w <- wide |> filter(recon == r)
-  S <- ar1_surrogates(w$d18O)
-  cols <- c("tot", as.character(regions$name))
-  tibble(series = cols) |> rowwise() |>
-    mutate(r_obs = cor(w$d18O, w[[series]]),
-           p = mean(abs(cor(S$sur, w[[series]])) >= abs(r_obs))) |>
-    ungroup() |> mutate(recon = r, n = nrow(w), phi = S$phi)
-}
-ct <- bind_rows(cor_table("GLAC-1D"), cor_table("ICE-6G"))
-ct_g <- ct |> filter(recon == "GLAC-1D"); ct_i <- ct |> filter(recon == "ICE-6G")
-tot_g <- ct_g |> filter(series == "tot"); tot_i <- ct_i |> filter(series == "tot")
-best_g <- ct_g |> filter(series != "tot") |> slice_max(r_obs, n = 1)
-best_i <- ct_i |> filter(series != "tot") |> slice_max(r_obs, n = 1)
-# first differences
-wg <- wide |> filter(recon == "GLAC-1D")
-r_diff <- cor(diff(wg$d18O), diff(wg$tot))
+#| label: sites
+site_ts <- long |> select(recon, age, region, anom) |> mutate(region = as.character(region)) |>
+  inner_join(wts |> select(site, amoc_mode, region, weight), by = "region", relationship = "many-to-many") |>
+  group_by(recon, amoc_mode, site, age) |> summarise(anom = sum(weight * anom), .groups = "drop")
+site_info <- wts |> distinct(site, type, lat, lon) |> arrange(desc(lat))
+site_sum <- site_ts |> filter(age >= win[1], age <= win[2]) |>
+  group_by(recon, amoc_mode, site) |> summarise(mean = mean(anom), min = min(anom), .groups = "drop")
+nisa_c <- long |> filter(age >= win[1], age <= win[2]) |> select(recon, age, region, anom) |>
+  mutate(region = as.character(region)) |>
+  inner_join(wts |> filter(site == "La Vallina (NISA)") |> select(amoc_mode, region, weight),
+             by = "region", relationship = "many-to-many") |>
+  mutate(c = weight * anom) |>
+  group_by(recon, amoc_mode, region) |> summarise(mean = mean(c), sd = sd(c), .groups = "drop") |>
+  group_by(recon, amoc_mode) |> mutate(share = mean / sum(mean)) |> ungroup()
+nisa_top <- nisa_c |> group_by(recon, amoc_mode) |> slice_max(share, n = 1) |> ungroup()
+nisa_var <- nisa_c |> group_by(recon, amoc_mode) |> slice_max(sd, n = 1) |> ungroup()
+nt <- function(r, m, what = nisa_top) what |> filter(recon == r, amoc_mode == m)
+ss <- function(r, m, s, v = "mean") site_sum[[v]][site_sum$recon == r & site_sum$amoc_mode == m & site_sum$site == s]
+zc <- site_sum |> select(recon, amoc_mode, site, mean) |> pivot_wider(names_from = amoc_mode, values_from = mean) |>
+  mutate(ratio = zonal / cold)
+var_same <- nisa_var |> group_by(recon) |> summarise(same = n_distinct(region) == 1) |> pull(same) |> all()
 ```
 
-**Correlation at lag 0.** @tbl-cor lists the correlations. Binned Glas δ¹⁸O
-is only weakly correlated with the GLAC-1D total anomaly
-(r = `r fmt(tot_g$r_obs)`, n = `r tot_g$n` bins) and moderately with the
-ICE-6G total (r = `r fmt(tot_i$r_obs)`, n = `r tot_i$n`). The strongest
-regional correlation in both reconstructions is with
-**`r best_g$series`** (r = `r fmt(best_g$r_obs)` in GLAC-1D,
-`r fmt((ct_i |> filter(series == best_g$series))$r_obs)` in ICE-6G), the
-sector that discharges into the Norwegian Sea close to the NISA moisture
-source. EIS_BayOfBiscay is negatively correlated in GLAC-1D
-(r = `r fmt((ct_g |> filter(series == "EIS_BayOfBiscay"))$r_obs)`) because its
-discharge peaks at 22–23 ka while Glas records re-salinisation. The binned
-Glas series has a lag-1 autocorrelation of `r fmt(tot_g$phi)` at 100-yr
-resolution, so the effective sample size is small. Against AR(1) surrogates
-only the EIS_NorwegianSea (positive) and EIS_BayOfBiscay (negative)
-correlations in GLAC-1D reach p < 0.05
-(p = `r fmtp((ct_g |> filter(series == "EIS_NorwegianSea"))$p)` and
-`r fmtp((ct_g |> filter(series == "EIS_BayOfBiscay"))$p)`); the total
-anomalies do not (p = `r fmtp(tot_g$p)` and `r fmtp(tot_i$p)`), and nothing
-does in ICE-6G with `r tot_i$n` bins. Correlation of first differences is
-likewise weak (r = `r fmt(r_diff)`). Level correlations therefore do not
-demonstrate alignment: both series share a long-term deglacial trend and a
-few pulses, which is not enough to separate from red noise.
+@fig-sites shows the transport-weighted anomaly at all nine sites. The
+anomaly is largest in the Nordic Seas and the subpolar North Atlantic and
+smallest at the continental sites. PS2644-5 averages
+`r fmt(ss("GLAC-1D", "cold", "PS2644-5"))` ‰ over the Glas interval with
+GLAC-1D in the cold mode, compared with
+`r fmt(ss("GLAC-1D", "cold", "La Vallina (NISA)"))` ‰ at NISA. In the zonal
+mode, with a strong AMOC, the sites receive between
+`r fmt(100 * min(zc$ratio), 0)` and `r fmt(100 * max(zc$ratio), 0)` % of the
+cold-mode anomaly (median `r fmt(100 * median(zc$ratio), 0)` %), because more
+of the meltwater is exported from the surface North Atlantic.
+@tbl-sites lists the sites and their Glas-interval means.
+
+At NISA, weighting by transport changes the ranking of the source regions
+(@fig-nisa). In GLAC-1D, `r nt("GLAC-1D", "cold")$region` becomes the most
+important contributor, with `r fmt(100 * nt("GLAC-1D", "cold")$share, 0)` % of
+the anomaly in the cold mode and `r fmt(100 * nt("GLAC-1D", "zonal")$share, 0)` %
+in the zonal mode. The Bay of Biscay transports efficiently to the cave's
+moisture source, whereas the two Arctic sectors, which rank near the top on
+the source side, reach NISA only weakly. In ICE-6G, `r nt("ICE-6G", "cold")$region`
+stays first, with `r fmt(100 * nt("ICE-6G", "cold")$share, 0)` % (cold) and
+`r fmt(100 * nt("ICE-6G", "zonal")$share, 0)` % (zonal). The most variable
+contribution at NISA is `r nt("GLAC-1D", "cold", nisa_var)$region` in GLAC-1D
+and `r nt("ICE-6G", "cold", nisa_var)$region` in ICE-6G
+`r ifelse(var_same, "in both AMOC modes", "in the cold AMOC mode")`.
 
 ```{r}
-#| label: tbl-cor
-#| tbl-cap: "Pearson correlation between binned Glas δ¹⁸O and the total and per-region source anomalies at lag 0. p is the two-sided fraction of AR(1) surrogates of the Glas series with |r| at least as large."
-ct |> mutate(series = ifelse(series == "tot", "Total (all regions)", series)) |>
-  select(series, recon, r_obs, p) |>
-  pivot_wider(names_from = recon, values_from = c(r_obs, p)) |>
-  transmute(Series = series,
-            `r (GLAC-1D)` = fmt(`r_obs_GLAC-1D`), `p` = fmtp(`p_GLAC-1D`),
-            `r (ICE-6G)` = fmt(`r_obs_ICE-6G`), `p ` = fmtp(`p_ICE-6G`)) |>
+#| label: fig-sites
+#| fig-cap: "Transport-weighted δ¹⁸O anomaly at the nine proxy sites of Endres et al. (2026b), ordered from north to south: the sum over regions of the source anomaly (−35 ‰ end-member) times the site's transport weight. Solid lines: cold (weak) AMOC mode; dashed: zonal (strong) mode. Grey shading marks the Glas interval. This is an equilibrium approximation that ignores transit times, so short pulses are overstated."
+#| fig-width: 7
+#| fig-height: 6.2
+rec_col <- c("GLAC-1D" = "#184f95", "ICE-6G" = "#c26a00")
+ggplot(site_ts |> mutate(site = factor(site, levels = site_info$site)),
+       aes(age / 1000, anom, colour = recon, linetype = amoc_mode)) +
+  annotate("rect", xmin = win[1] / 1000, xmax = win[2] / 1000, ymin = -Inf, ymax = Inf, fill = "grey92") +
+  geom_hline(yintercept = 0, linewidth = 0.25, colour = "grey60") +
+  geom_line(linewidth = 0.35) +
+  facet_wrap(~site, ncol = 3) +
+  scale_x_reverse(limits = c(28, 0), breaks = seq(28, 0, -7)) +
+  scale_colour_manual(values = rec_col, name = NULL) +
+  scale_linetype_manual(values = c(cold = "solid", zonal = "22"), labels = c(cold = "Cold AMOC mode", zonal = "Zonal AMOC mode"), name = NULL) +
+  labs(x = "Age (ka BP)", y = expression("Site" ~ delta^18*O ~ "anomaly (‰)")) +
+  theme_ms + theme(legend.position = "bottom")
+```
+
+```{r}
+#| label: tbl-sites
+#| tbl-cap: "Proxy sites of Endres et al. (2026b) used here, from north to south, with the mean transport-weighted δ¹⁸O anomaly over the Glas interval (‰, −35 ‰ end-member) for each reconstruction and AMOC mode."
+site_info |>
+  left_join(site_sum |> mutate(col = paste(recon, amoc_mode)) |> select(site, col, mean) |>
+              pivot_wider(names_from = col, values_from = mean), by = "site") |>
+  transmute(Site = site, Type = type, `Lat (°N)` = fmt(lat, 1), `Lon (°E)` = fmt(lon, 1),
+            `GLAC-1D cold` = fmt(`GLAC-1D cold`), `GLAC-1D zonal` = fmt(`GLAC-1D zonal`),
+            `ICE-6G cold` = fmt(`ICE-6G cold`), `ICE-6G zonal` = fmt(`ICE-6G zonal`)) |>
   knitr::kable()
 ```
 
 ```{r}
-#| label: lags
-lags <- seq(-20, 20)
-S <- ar1_surrogates(wg$d18O)
-cc <- tibble(lag = lags * step["GLAC-1D"],
-             r = sapply(lags, function(k) lagcor(wg$d18O, wg$tot, k)),
-             lo = sapply(lags, function(k) quantile(apply(S$sur, 2, lagcor, y = wg$tot, k = k), 0.025)),
-             hi = sapply(lags, function(k) quantile(apply(S$sur, 2, lagcor, y = wg$tot, k = k), 0.975)))
-cc_max <- cc |> slice_max(r, n = 1)
+#| label: fig-nisa
+#| fig-cap: "Importance of the source regions at NISA after weighting by transport: share of the transport-weighted anomaly within the Glas interval, for each reconstruction and AMOC mode. Compare with the source-side shares in @fig-importance; labels give shares of at least 7 %."
+#| fig-width: 7
+#| fig-height: 3
+nb <- nisa_c |>
+  mutate(bar = factor(paste(recon, amoc_mode, sep = " · "),
+                      levels = rev(c("GLAC-1D · cold", "GLAC-1D · zonal", "ICE-6G · cold", "ICE-6G · zonal"))),
+         region = factor(region, levels = rev(ice_order))) |>
+  arrange(bar, desc(region)) |> group_by(bar) |>
+  mutate(xmax = cumsum(share), xmin = xmax - share, xmid = (xmin + xmax) / 2) |> ungroup()
+ggplot(nb) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = as.numeric(bar) - 0.38, ymax = as.numeric(bar) + 0.38, fill = region),
+            colour = "white", linewidth = 0.4) +
+  geom_text(data = nb |> filter(share >= 0.07), aes(xmid, as.numeric(bar), label = fmt(100 * share, 0)),
+            size = 2.6, colour = "white", fontface = "bold") +
+  scale_y_continuous(breaks = seq_along(levels(nb$bar)), labels = paste(levels(nb$bar), "mode"), expand = expansion(add = 0.3)) +
+  scale_x_continuous(labels = function(x) paste0(100 * x, " %"), breaks = seq(0, 1, 0.25), expand = expansion(mult = c(0, 0.01))) +
+  scale_fill_manual(values = reg_col, breaks = ice_order, name = NULL) +
+  labs(x = "Share of the transport-weighted anomaly at NISA", y = NULL) +
+  theme_ms + theme(legend.position = "bottom", panel.grid.major.y = element_blank()) +
+  guides(fill = guide_legend(nrow = 3))
 ```
 
-**Lead–lag.** The cross-correlation between Glas δ¹⁸O and the GLAC-1D total
-anomaly (@fig-ccf) is highest at a lag of `r cc_max$lag` yr
-(r = `r fmt(cc_max$r)`), i.e. with the Glas record **leading** the GLAC-1D
-discharge by about `r abs(cc_max$lag)` yr, compared with
-r = `r fmt(cc$r[cc$lag == 0])` at zero lag. The peak lies
-`r ifelse(cc_max$r > cc_max$hi, "above", "within")` the 95 % surrogate
-envelope. This is consistent with the observation in Endres et al. (2026a)
-that GLAC-1D places the deglacial melt events roughly 500 yr later than Glas.
+## The Glas age-model ensemble
+
+The rerun Bchron ensemble reproduces the published chronology
+(@fig-agemodel). The ensemble median differs from the published ages by
+`r fmt(sqrt(mean(dev^2)), 0)` yr root-mean-square and at most
+`r fmt(max(abs(dev)), 0)` yr, at `r fmt(glas$depth_sample[which.max(abs(dev))], 1)` mm.
+The median 95 % half-width is `r fmt(median(hw_ens), 0)` yr, against
+`r fmt(median(hw_pub), 0)` yr for the published uncertainties, and it grows to
+`r fmt(max(hw_ens), 0)` yr at the young end of the record, where the two
+youngest dates are `r fmt(diff(dates$corr_age[1:2]), 0)` yr apart.
+
+```{r}
+#| label: fig-agemodel
+#| fig-cap: "Glas age–depth model. Shading: 95 % (light) and 90 % (dark) range of the Bchron ensemble. Black line: published chronology. Points and bars: U–Th dates with their uncertainties."
+#| fig-width: 6
+#| fig-height: 3.6
+agm <- tibble(depth = glas$depth_sample, pub = glas$interp_age,
+              lo95 = ens_q["2.5%", ], hi95 = ens_q["97.5%", ], lo90 = ens_q["5%", ], hi90 = ens_q["95%", ])
+ggplot(agm, aes(depth)) +
+  geom_ribbon(aes(ymin = lo95 / 1000, ymax = hi95 / 1000), fill = "#cde2fb") +
+  geom_ribbon(aes(ymin = lo90 / 1000, ymax = hi90 / 1000), fill = "#86b6ef") +
+  geom_line(aes(y = pub / 1000), linewidth = 0.4) +
+  geom_errorbar(data = dates, aes(x = depth_dating, ymin = (corr_age - corr_age_uncert_neg) / 1000,
+                                  ymax = (corr_age + corr_age_uncert_pos) / 1000), width = 0.3, inherit.aes = FALSE) +
+  geom_point(data = dates, aes(x = depth_dating, y = corr_age / 1000), size = 1.3, inherit.aes = FALSE) +
+  labs(x = "Depth from top (mm)", y = "Age (ka BP)") + theme_ms
+```
+
+## Alignment between Glas δ¹⁸O and the discharge
+
+```{r}
+#| label: b1-prep
+ksmooth_g <- function(t, x, h, tout = t) {
+  W <- exp(-outer(tout, t, "-")^2 / (2 * h^2)); as.vector((W %*% x) / rowSums(W))
+}
+zs <- function(x) (x - mean(x)) / sd(x)
+h_hp <- 750; h_k <- 25
+kxcf <- function(tx, x, ty, y, lags, h) {     # tau > 0: y (discharge) leads x (Glas)
+  D <- outer(tx, ty, "-"); XY <- outer(x, y)
+  vapply(lags, function(tau) { W <- exp(-(D - tau)^2 / (2 * h^2)); sum(W * XY) / sum(W) }, numeric(1))
+}
+ar1_irreg <- function(t, tau_p, nsim) {
+  n <- length(t); a <- exp(-abs(diff(t)) / tau_p)
+  m <- matrix(rnorm(n * nsim), n, nsim)
+  for (i in 2:n) m[i, ] <- a[i - 1] * m[i - 1, ] + sqrt(1 - a[i - 1]^2) * m[i, ]
+  m
+}
+phase_rand <- function(y, nsim) {
+  n <- length(y); f <- fft(y); half <- floor((n - 1) / 2)
+  sapply(seq_len(nsim), function(s) {
+    g <- f; g[2:(half + 1)] <- Mod(f[2:(half + 1)]) * exp(1i * runif(half, 0, 2 * pi))
+    g[n:(n - half + 1)] <- Conj(g[2:(half + 1)]); Re(fft(g, inverse = TRUE)) / n
+  })
+}
+tau_from <- function(t, x, st = 100) {
+  b <- tibble(age = round(-t / st) * st, x = x) |> group_by(age) |> summarise(x = mean(x)) |> arrange(desc(age))
+  phi <- cor(b$x[-1], b$x[-nrow(b)]); list(phi = phi, tau = -st / log(phi))
+}
+
+lags <- seq(-2000, 2000, 100)
+tG <- -glas$interp_age
+xG_hp <- zs(glas$d18O_measurement - ksmooth_g(tG, glas$d18O_measurement, h_hp))
+xG_lv <- zs(glas$d18O_measurement)
+wide <- long |> filter(recon == "GLAC-1D", age >= win[1] - 2500, age <= win[2] + 2500) |>
+  select(age, region, anom) |> pivot_wider(names_from = region, values_from = anom) |> arrange(desc(age))
+wide$Total <- rowSums(wide[, as.character(regions$region)])
+tD <- -wide$age
+inwin <- wide$age >= win[1] & wide$age <= win[2]
+series <- c("Total", as.character(regions$region))
+stdw <- function(y) (y - mean(y[inwin])) / sd(y[inwin])
+Y_hp <- sapply(series, function(s) { y <- wide[[s]]; stdw(y - ksmooth_g(tD, y, h_hp)) })
+Y_lv <- sapply(series, function(s) stdw(wide[[s]]))
+
+p_hp <- tau_from(tG, xG_hp); p_lv <- tau_from(tG, xG_lv)
+phi_d <- { y <- Y_hp[inwin, "Total"]; cor(y[-1], y[-length(y)]) }
+n_eff <- sum(inwin) * (1 - p_hp$phi * phi_d) / (1 + p_hp$phi * phi_d)
+
+obs_hp <- sapply(series, function(s) kxcf(tG, xG_hp, tD, Y_hp[, s], lags, h_k))
+obs_lv <- sapply(series, function(s) kxcf(tG, xG_lv, tD, Y_lv[, s], 0, h_k))
+```
+
+```{r}
+#| label: b1-null
+NS <- 300
+S_hp <- apply(ar1_irreg(tG, p_hp$tau, NS), 2, zs)
+S_lv <- apply(ar1_irreg(tG, p_lv$tau, NS), 2, zs)
+null_hp <- array(NA, c(length(lags), length(series), NS))
+null_lv <- matrix(NA, length(series), NS)
+for (k in seq_len(NS)) for (s in seq_along(series)) {
+  null_hp[, s, k] <- kxcf(tG, S_hp[, k], tD, Y_hp[, series[s]], lags, h_k)
+  null_lv[s, k]   <- kxcf(tG, S_lv[, k], tD, Y_lv[, series[s]], 0, h_k)
+}
+PR <- phase_rand(wide$Total - ksmooth_g(tD, wide$Total, h_hp), NS)
+PR <- apply(PR, 2, stdw)
+null_pr <- sapply(seq_len(NS), function(k) kxcf(tG, xG_hp, tD, PR[, k], lags, h_k))
+
+env_hp <- apply(null_hp[, 1, ], 1, quantile, c(0.025, 0.975))
+fw_all <- apply(abs(null_hp), 3, max)
+fw_tot <- apply(abs(null_hp[, 1, ]), 2, max)
+fw_pr  <- apply(abs(null_pr), 2, max)
+p_fw_all <- mean(fw_all >= max(abs(obs_hp)))
+p_fw_tot <- mean(fw_tot >= max(abs(obs_hp[, "Total"])))
+p_fw_pr  <- mean(fw_pr  >= max(abs(obs_hp[, "Total"])))
+p_hp0 <- sapply(seq_along(series), function(s) mean(abs(null_hp[lags == 0, s, ]) >= abs(obs_hp[lags == 0, s])))
+p_lv0 <- sapply(seq_along(series), function(s) mean(abs(null_lv[s, ]) >= abs(obs_lv[s])))
+obs_pk <- which.max(obs_hp[, "Total"])
+```
+
+```{r}
+#| label: b1-ensemble
+NE <- 200; idx <- round(seq(1, N, length.out = NE))
+ens_hp <- array(NA, c(length(lags), length(series), NE)); ens_lv <- matrix(NA, length(series), NE)
+for (j in seq_len(NE)) {
+  tm <- -A[idx[j], ]
+  xm <- zs(glas$d18O_measurement - ksmooth_g(tm, glas$d18O_measurement, h_hp))
+  for (s in seq_along(series)) {
+    ens_hp[, s, j] <- kxcf(tm, xm, tD, Y_hp[, series[s]], lags, h_k)
+    ens_lv[s, j]   <- kxcf(tm, xG_lv, tD, Y_lv[, series[s]], 0, h_k)
+  }
+}
+ens_pk_lag <- lags[apply(ens_hp[, 1, ], 2, which.max)]
+ens_pk_r   <- apply(ens_hp[, 1, ], 2, max)
+frac_fw    <- mean(apply(abs(ens_hp[, 1, ]), 2, max) > quantile(fw_tot, 0.95))
+frac_fwall <- mean(apply(abs(ens_hp), 3, max) > quantile(fw_all, 0.95))
+ens_hp0 <- ens_hp[lags == 0, , ]
+q_lv <- apply(null_lv, 1, function(z) quantile(abs(z), 0.95))
+frac_lv_sig <- rowMeans(abs(ens_lv) > q_lv)
+```
+
+**Correlation.** @tbl-cor lists the zero-lag correlations. On the full
+(level) series, Glas correlates positively with the GLAC-1D total anomaly
+(r = `r fmt(obs_lv[1])`), moderately positively with EIS_NorwegianSea
+(r = `r fmt(obs_lv["EIS_NorwegianSea"])`) and strongly negatively with
+EIS_BayOfBiscay (r = `r fmt(obs_lv["EIS_BayOfBiscay"])`). Bay of Biscay
+discharge peaks at the Last Glacial Maximum, when Glas records its highest
+δ¹⁸O. Against AR(1) surrogates with the high persistence of the level series,
+`r ifelse(any(p_lv0 < 0.05), paste(paste(series[p_lv0 < 0.05], collapse = " and "), "reach"), "no series reaches")`
+p < 0.05 (smallest p = `r fmtp(min(p_lv0))`, `r series[which.min(p_lv0)]`).
+Across the age ensemble the level correlations barely change, because the age
+uncertainty is small compared with millennial variations. They are stable,
+but a shared millennial pattern of this length is also what red noise
+produces often.
+
+At centennial time scales the picture changes. The high-passed Glas series
+correlates *negatively* with the high-passed total anomaly at zero lag
+(r = `r fmt(obs_hp[lags == 0, "Total"])` on the published chronology,
+`r rng(ens_hp0[1, ])` across the ensemble). No region reaches p < 0.05 at
+zero lag (smallest p = `r fmtp(min(p_hp0))`, `r series[which.min(p_hp0)]`).
+The high-passed series have lag-1 autocorrelations of
+`r fmt(p_hp$phi)` (Glas, 100-yr bins) and `r fmt(phi_d)` (GLAC-1D total), which
+leaves about `r fmt(n_eff, 0)` effectively independent pairs in
+`r sum(inwin)` 100-yr steps.
+
+```{r}
+#| label: tbl-cor
+#| tbl-cap: "Zero-lag kernel correlations between Glas δ¹⁸O and the GLAC-1D total and regional anomalies. Level: full series. High-pass: centennial residual after removing a 750-yr Gaussian smoother. r and p on the published chronology (p: two-sided, 300 AR(1) surrogates of Glas). Ensemble: 5–95 % range over 200 Bchron age models."
+tibble(Series = ifelse(series == "Total", "Total (all regions)", series),
+       `Level r` = fmt(obs_lv), `p` = fmtp(p_lv0),
+       `Level r, ensemble` = apply(ens_lv, 1, rng),
+       `High-pass r` = fmt(obs_hp[lags == 0, ]), `p ` = fmtp(p_hp0),
+       `High-pass r, ensemble` = apply(ens_hp0, 1, rng)) |>
+  knitr::kable()
+```
+
+**Lead and lag.** The high-passed cross-correlation with the GLAC-1D total
+(@fig-ccf) peaks at a lag of `r lags[obs_pk]` yr (r = `r fmt(obs_hp[obs_pk, "Total"])`)
+on the published chronology, which means Glas *leads* the discharge. Across
+the ensemble the peak lag has a median of `r fmt(median(ens_pk_lag), 0)` yr
+(5–95 %: `r fmt(quantile(ens_pk_lag, 0.05), 0)` to
+`r fmt(quantile(ens_pk_lag, 0.95), 0)` yr) and a median peak r of
+`r fmt(median(ens_pk_r))`. After accounting for the search over lags, the
+peak is not significant (family-wise p = `r fmtp(p_fw_tot)` against AR(1)
+surrogates of Glas and `r fmtp(p_fw_pr)` against phase-randomised discharge).
+Over all ten series and all lags, family-wise p = `r fmtp(p_fw_all)`. The
+family-wise 95 % threshold is exceeded by `r fmt(100 * frac_fw, 0)` % of
+ensemble members for the total anomaly and by `r fmt(100 * frac_fwall, 0)` %
+for any region.
 
 ```{r}
 #| label: fig-ccf
-#| fig-cap: "Cross-correlation between binned Glas δ¹⁸O and the GLAC-1D total source anomaly. Positive lags mean the discharge leads Glas; negative lags mean Glas leads. Shading: 95 % envelope from 2,000 AR(1) surrogates of the Glas series."
+#| fig-cap: "Kernel cross-correlation between high-passed Glas δ¹⁸O and the high-passed GLAC-1D total anomaly. Negative lags mean Glas leads. Line: published chronology. Blue band: 5–95 % range over 200 Bchron age models. Grey band: pointwise 95 % range of 300 AR(1) surrogates. Dashed lines: family-wise 95 % threshold over all lags."
 #| fig-width: 6
 #| fig-height: 3.2
-ggplot(cc, aes(lag, r)) +
-  geom_ribbon(aes(ymin = lo, ymax = hi), fill = "grey85") +
+ccf_df <- tibble(lag = lags, r = obs_hp[, "Total"], lo = env_hp[1, ], hi = env_hp[2, ],
+                 elo = apply(ens_hp[, 1, ], 1, quantile, 0.05), ehi = apply(ens_hp[, 1, ], 1, quantile, 0.95))
+fwq <- quantile(fw_tot, 0.95)
+ggplot(ccf_df, aes(lag)) +
+  geom_ribbon(aes(ymin = lo, ymax = hi), fill = "grey88") +
+  geom_ribbon(aes(ymin = elo, ymax = ehi), fill = "#86b6ef", alpha = 0.6) +
   geom_hline(yintercept = 0, linewidth = 0.3) +
-  geom_line(colour = "#1f5f99") + geom_point(colour = "#1f5f99", size = 1.2) +
-  labs(x = "Lag (yr; > 0 = discharge leads Glas)", y = "Pearson r") +
-  theme_bw(base_size = 10)
+  geom_hline(yintercept = c(-fwq, fwq), linetype = "dashed", linewidth = 0.3, colour = ink2) +
+  geom_line(aes(y = r), colour = "#184f95", linewidth = 0.6) +
+  labs(x = "Lag (yr); < 0: Glas leads", y = "Kernel correlation r") + theme_ms
 ```
 
 ```{r}
-#| label: events
-tg <- tot |> filter(recon == "GLAC-1D", age >= win[1] - 500, age <= win[2] + 500) |>
-  arrange(desc(age)) |> mutate(dA = tot - lag(tot))
+#| label: b2-events
+ev_pub <- tribble(
+  ~event,   ~mid_pub, ~lo,   ~hi,   ~sign, ~d1,   ~d2,
+  "23.4kS", 23440, 23330, 24050,  1, 37.2, 39.2,
+  "17.8kS", 17840, 17820, 18030, -1, 20.2, 20.95,
+  "16.4kS", 16440, 16140, 16550, -1, 15.35, 15.5,
+  "16.1kS", 16070, 15900, 16380, -1, 14.45, 14.75,
+  "15.3kS", 15270, 15140, 15360, -1, 12.2, 12.8,
+  "14.7kS", 14680, 14540, 14810,  1, 11.1, 11.45) |>
+  mutate(depth = (d1 + d2) / 2, age_pub = approx(glas$depth_sample, glas$interp_age, depth)$y)
+age_at_depth <- function(dep) sapply(dep, function(d) {
+  i <- findInterval(d, glas$depth_sample, all.inside = TRUE)
+  w <- (d - glas$depth_sample[i]) / (glas$depth_sample[i + 1] - glas$depth_sample[i])
+  A[, i] * (1 - w) + A[, i + 1] * w })
+
+tg <- tot |> filter(recon == "GLAC-1D", age >= win[1] - 600, age <= win[2] + 600) |>
+  arrange(desc(age)) |> mutate(dA = tot - lag(tot), amid = age + 50)
 sd_dA <- sd(tg$dA, na.rm = TRUE)
 pick_runs <- function(idx, val, keep_min) {
   if (!length(idx)) return(integer(0))
   runs <- split(idx, cumsum(c(1, diff(idx) != 1)))
-  vapply(runs, function(ix) ix[if (keep_min) which.min(val[ix]) else which.max(val[ix])], integer(1))
+  vapply(runs, function(ix) ix[if (keep_min) which.min(val[ix]) else which.max(val[ix])], integer(1)) }
+detect_pulses <- function(k) {
+  thr <- k * sd_dA
+  bind_rows(tibble(idx = pick_runs(which(tg$dA < -thr), tg$dA, TRUE), sign = -1),
+            tibble(idx = pick_runs(which(tg$dA >  thr), tg$dA, FALSE), sign = 1)) |>
+    mutate(age = tg$amid[idx], dA = tg$dA[idx]) |> arrange(desc(age)) }
+nearest <- function(ages, signs, pl) sapply(seq_along(ages), function(i) {
+  p <- pl$age[pl$sign == signs[i]]; if (length(p)) p[which.min(abs(p - ages[i]))] else NA })
+match_count <- function(ages, signs, pl, tol) sum(abs(ages - nearest(ages, signs, pl)) <= tol, na.rm = TRUE)
+null_rand <- function(signs, pl, tol, B = 5000)
+  replicate(B, match_count(runif(length(signs), win[1], win[2]), signs, pl, tol))
+ens_events <- function(EA, ev, pl, tol) {
+  NM <- matrix(unlist(lapply(seq_len(nrow(EA)), function(m) nearest(EA[m, ], ev$sign, pl))), nrow = nrow(EA), byrow = TRUE)
+  list(mc = rowSums(abs(EA - NM) <= tol, na.rm = TRUE), pm = colMeans(abs(EA - NM) <= tol, na.rm = TRUE), off = EA - NM)
 }
-detect_pulses <- function(mult) {
-  thr <- mult * sd_dA
-  i_f <- pick_runs(which(tg$dA < -thr), tg$dA, TRUE)
-  i_r <- pick_runs(which(tg$dA >  thr), tg$dA, FALSE)
-  bind_rows(tibble(idx = i_f, sign = -1), tibble(idx = i_r, sign = 1)) |>
-    mutate(age = tg$age[idx], dA = tg$dA[idx]) |> arrange(desc(age))
-}
-thr <- 1 * sd_dA
+
 pulses <- detect_pulses(1)
+EA_pub <- age_at_depth(ev_pub$depth)
+r_pub  <- ens_events(EA_pub, ev_pub, pulses, 300)
+nr_pub <- null_rand(ev_pub$sign, pulses, 300)
+mc_pub_med <- match_count(ev_pub$age_pub, ev_pub$sign, pulses, 300)
+p_pub  <- mean(nr_pub >= median(r_pub$mc))
+ev_pub <- ev_pub |> mutate(pulse = nearest(age_pub, sign, pulses), offset = age_pub - pulse,
+                           pm = r_pub$pm, ens_lo = apply(EA_pub, 2, quantile, 0.05),
+                           ens_hi = apply(EA_pub, 2, quantile, 0.95),
+                           off_lo = apply(r_pub$off, 2, quantile, 0.05), off_hi = apply(r_pub$off, 2, quantile, 0.95))
+ev_hw <- (ev_pub$ens_hi - ev_pub$ens_lo) / 2
 
-# Glas events: Table 1 of Endres et al. (2026a), d18O events only
-ev_tab <- tribble(
-  ~event,   ~mid,  ~lo,   ~hi,   ~sign,
-  "23.4kS", 23440, 23330, 24050,  1,
-  "17.8kS", 17840, 17820, 18030, -1,
-  "16.4kS", 16440, 16140, 16550, -1,
-  "16.1kS", 16070, 15900, 16380, -1,
-  "15.3kS", 15270, 15140, 15360, -1,
-  "14.7kS", 14680, 14540, 14810,  1
-) |> mutate(source = "Endres et al. (2026a), Table 1")
-# data-driven: 100-yr bin steps > 2 SD
-wg2 <- wg |> mutate(dd = d18O - lag(d18O))
-thr_g <- 2 * sd(wg2$dd, na.rm = TRUE)
-i_g <- c(pick_runs(which(wg2$dd < -thr_g), wg2$dd, TRUE), pick_runs(which(wg2$dd > thr_g), wg2$dd, FALSE))
-ev_dd <- tibble(event = sprintf("%.1fk (step)", wg2$age[i_g] / 1000), mid = wg2$age[i_g],
-                lo = NA, hi = NA, sign = sign(wg2$dd[i_g]), source = "Bin step > 2 SD")
-events <- bind_rows(ev_tab, ev_dd) |> arrange(desc(mid))
+sens <- expand_grid(k = c(1, 1.5, 2), tol = c(200, 300, 500)) |> rowwise() |>
+  mutate(pl = list(detect_pulses(k)), n_pulses = nrow(pl),
+         mc = list(ens_events(EA_pub, ev_pub, pl, tol)$mc),
+         mc_med = median(mc), mc_lo = quantile(mc, 0.05), mc_hi = quantile(mc, 0.95),
+         nl = list(null_rand(ev_pub$sign, pl, tol, 2000)),
+         null_mean = mean(nl), p = mean(nl >= mc_med), p_frac = mean(sapply(mc, function(m) mean(nl >= m)) < 0.05)) |>
+  ungroup() |> select(-pl, -mc, -nl)
 
-match_events <- function(ev, pl = pulses, tol = 300) {
-  ev |> rowwise() |> mutate(
-    pulse_age = { p <- pl$age[pl$sign == sign]; if (length(p)) p[which.min(abs(p - mid))] else NA_real_ },
-    lead = mid - pulse_age,          # > 0: Glas event older, i.e. Glas leads
-    matched = !is.na(lead) & abs(lead) <= tol) |> ungroup()
-}
-null_matches <- function(signs, pl = pulses, B = 5000, tol = 300) {
-  replicate(B, {
-    ages <- runif(length(signs), win[1], win[2])
-    sum(mapply(function(a, s) { p <- pl$age[pl$sign == s]; length(p) && min(abs(p - a)) <= tol }, ages, signs))
-  })
-}
-em <- match_events(events)
-n_obs <- sum(em$matched[em$source != "Bin step > 2 SD"]); n_ev <- sum(em$source != "Bin step > 2 SD")
-n_obs_all <- sum(em$matched); n_all <- nrow(em)
-nm  <- null_matches(ev_tab$sign);  p_ev  <- mean(nm  >= n_obs)
-nm2 <- null_matches(events$sign);  p_all <- mean(nm2 >= n_obs_all)
-em_t1 <- em |> filter(source != "Bin step > 2 SD")
-off_rng <- range(em_t1$lead); med_lead <- median(em_t1$lead)
+deltas <- seq(-1000, 1000, 100)
+scan <- map_dfr(deltas, function(dl) {
+  pl <- pulses |> mutate(age = age + dl); mc <- ens_events(EA_pub, ev_pub, pl, 300)$mc
+  tibble(delta = dl, pub = match_count(ev_pub$age_pub, ev_pub$sign, pl, 300),
+         med = median(mc), lo = quantile(mc, 0.05), hi = quantile(mc, 0.95)) })
 
-# Sensitivity of the Table 1 event matching to pulse threshold and tolerance
-sens <- expand_grid(mult = c(1, 1.5, 2), tol = c(200, 300, 500)) |> rowwise() |>
-  mutate(pl = list(detect_pulses(mult)),
-         n_pulses = nrow(pl),
-         matched = sum(match_events(ev_tab, pl, tol)$matched),
-         null = list(null_matches(ev_tab$sign, pl, B = 2000, tol = tol)),
-         null_mean = mean(null), p = mean(null >= matched)) |>
-  ungroup() |> select(-pl, -null)
-# use the (1 SD, 300 yr) cell of the sensitivity grid as the headline null
-p_ev <- (sens |> filter(mult == 1, tol == 300))$p
-nm_mean <- (sens |> filter(mult == 1, tol == 300))$null_mean
+# Objective breakpoints on the 100-yr binned series, calibrated against AR(1) surrogates
+gb <- glas |> mutate(age = round(interp_age / 100) * 100) |> group_by(age) |>
+  summarise(d = mean(d18O_measurement), depth = mean(depth_sample)) |> arrange(desc(age))
+rss_gain <- function(y, kmax = 10, h = 3) {
+  bpo <- breakpoints(y ~ 1, h = h, breaks = kmax); r <- summary(bpo)$RSS["RSS", ]
+  list(bp = bpo, gain = 1 - r[-1] / r[-length(r)]) }
+obs_bp <- rss_gain(gb$d)
+phi_lvb <- cor(gb$d[-1], gb$d[-nrow(gb)])
+sur_gain <- replicate(200, rss_gain(as.vector(arima.sim(list(ar = phi_lvb), n = nrow(gb))))$gain)
+q_gain <- apply(sur_gain, 1, quantile, 0.95)
+n_bp <- sum(cumprod(obs_bp$gain > q_gain))
+bpi <- breakpoints(obs_bp$bp, breaks = n_bp)$breakpoints
+seg <- c(0, bpi, nrow(gb))
+segmean <- sapply(seq_len(length(seg) - 1), function(i) mean(gb$d[(seg[i] + 1):seg[i + 1]]))
+ev_obj <- tibble(age_pub = (gb$age[bpi] + gb$age[bpi + 1]) / 2, depth = (gb$depth[bpi] + gb$depth[bpi + 1]) / 2,
+                 jump = segmean[-1] - segmean[-length(segmean)], sign = sign(jump))
+EA_obj <- age_at_depth(ev_obj$depth)
+r_obj <- ens_events(EA_obj, ev_obj, pulses, 300)
+ev_obj$pulse <- nearest(ev_obj$age_pub, ev_obj$sign, pulses)
 ```
 
-**Event matching.** The GLAC-1D total anomaly within the Glas interval has
+**Event matching.** Within the Glas interval, the GLAC-1D total anomaly has
 `r sum(pulses$sign == -1)` freshening pulses and `r sum(pulses$sign == 1)`
-recoveries exceeding the 1-SD threshold of `r fmt(thr, 1)` ‰ per
-`r step["GLAC-1D"]` yr (@fig-events, @tbl-events). Of the six δ¹⁸O events of
-Endres et al. (2026a), `r n_obs` have a same-sign pulse within ±300 yr;
-random placement of six such events gives `r fmt(nm_mean, 1)` matches on
-average (p = `r fmtp(p_ev)`), because with `r nrow(pulses)` pulses in
-`r fmt((win[2] - win[1]) / 1000, 1)` kyr a ±300-yr window is rarely empty.
-Including the `r nrow(ev_dd)` data-driven steps, `r n_obs_all` of `r n_all`
-events match (p = `r fmtp(p_all)`). @tbl-sens shows how this depends on the
-pulse threshold and the tolerance. With tolerances of ±200–300 yr the match
-count is at or above the random expectation for every threshold but not
-significant (p ≥ `r fmtp(min(sens$p[sens$tol <= 300]))`). With a ±500-yr
-tolerance `r (sens |> filter(mult == 1, tol == 500))$matched` of 6 events
-are matched at the 1-SD threshold and
-`r (sens |> filter(mult == 2, tol == 500))$matched` of 6 at the 2-SD
-threshold (the `r (sens |> filter(mult == 2, tol == 500))$n_pulses` largest
-pulses), with p = `r fmtp((sens |> filter(mult == 1, tol == 500))$p)` and
-`r fmtp((sens |> filter(mult == 2, tol == 500))$p)`. The Glas events thus
-coincide with GLAC-1D pulses at the ~500-yr level, which is also the scale of
-the age-model offsets between the two archives, but not at the 100–300-yr
-level. The offsets of the Table 1 events range from `r fmt(off_rng[1], 0)` to
-`r fmt(off_rng[2], 0)` yr (median `r fmt(med_lead, 0)` yr, positive = Glas
-earlier), i.e. the events show no consistent lead or lag at the event level;
-the ~`r abs(cc_max$lag)`-yr lead in the cross-correlation reflects the broad
-shape of the Heinrich Stadial 1 trough rather than the individual pulses.
+recoveries above the 1-SD threshold of `r fmt(sd_dA, 1)` ‰ per 100 yr
+(@fig-series). On the published chronology, `r mc_pub_med` of the six
+published Glas events have a same-sign pulse within ±300 yr (@tbl-events).
+Across the age ensemble the count ranges from `r min(r_pub$mc)` to
+`r max(r_pub$mc)` (median `r median(r_pub$mc)`). Random placement of six
+events gives `r fmt(mean(nr_pub), 1)` matches on average, so the median count
+has p = `r fmtp(p_pub)`. The Glas age uncertainty at the events
+(`r fmt(min(ev_hw), 0)`–`r fmt(max(ev_hw), 0)` yr, 5–95 % half-width) is
+comparable to the matching tolerance, so the match status of individual
+events is itself uncertain:
 
-The correspondences are specific rather than statistical. The Heinrich
-Stadial 1 freshening events 16.4kS, 16.1kS and 15.3kS fall within
-`r fmt(max(abs(em_t1$lead[em_t1$event %in% c("16.4kS", "16.1kS", "15.3kS")])), 0)` yr
-of the GLAC-1D pulses at 16.2–16.4 and 15.2 ka. The abrupt freshening onset
-at 17.8kS follows the GLAC-1D pulse at 18.2 ka (the Eurasian Arctic peak)
-by `r fmt(-em_t1$lead[em_t1$event == "17.8kS"], 0)` yr, just outside the
-±300-yr window; the forward-model draft discusses this either as a delayed
-response to that Arctic pulse or, on the timing of AMOC proxies, as
-meltwater retained at the surface by AMOC weakening. The re-salinisation at
-14.7kS coincides with Meltwater Pulse 1A, the largest freshening pulse of the
-series, an alignment of opposite sign that the draft reproduces as AMOC
-re-strengthening cancelling the anomaly at NISA. The data-driven Glas steps
-at 12.9–12.3 ka have no counterpart within 300 yr, and the large GLAC-1D
-pulses of the Younger Dryas (13.3 and 11.7 ka) have no counterpart in Glas,
-which the draft also notes as the main mismatch besides the LGM Bay of
-Biscay discharge.
+- **Robust matches.** `r paste(ev_pub$event[ev_pub$pm >= 0.8], collapse = ", ")`
+  are matched in at least 80 % of age models
+  (`r paste0(fmt(100 * ev_pub$pm[ev_pub$pm >= 0.8], 0), " %", collapse = ", ")`).
+  These are the Heinrich Stadial 1 freshening steps and the
+  Last Glacial Maximum re-salinisation.
+- **Uncertain matches.** `r paste(ev_pub$event[ev_pub$pm < 0.8], collapse = " and ")`
+  are matched in only `r paste0(fmt(100 * ev_pub$pm[ev_pub$pm < 0.8], 0), " %", collapse = " and ")`
+  of age models. The 17.8kS freshening onset lies
+  `r fmt(-ev_pub$offset[ev_pub$event == "17.8kS"], 0)` yr after the GLAC-1D
+  freshening pulse at `r ka(ev_pub$pulse[ev_pub$event == "17.8kS"], 2)` ka.
+  The 14.7kS re-salinisation lies `r fmt(ev_pub$offset[ev_pub$event == "14.7kS"], 0)` yr
+  before the nearest recovery. The nearest GLAC-1D *freshening* pulse lies
+  only `r fmt(abs(ev_pub$age_pub[6] - nearest(ev_pub$age_pub[6], -1, pulses)), 0)` yr
+  away, at `r ka(nearest(ev_pub$age_pub[6], -1, pulses), 2)` ka, during Meltwater
+  Pulse 1A. The event therefore aligns better with discharge of the opposite
+  sign.
+
+@fig-matches shows the six events on the Glas record, together with the
+nearest same-sign GLAC-1D pulse and how often the match holds across the age
+ensemble.
 
 ```{r}
-#| label: tbl-sens
-#| tbl-cap: "Sensitivity of the event matching (six Table 1 events) to the pulse threshold (multiples of the SD of 100-yr steps in the GLAC-1D total anomaly) and the matching tolerance. Null mean and p are from 2,000 random placements of the six events."
-sens |> transmute(`Threshold (SD)` = mult, `Tolerance (yr)` = tol, `Pulses` = n_pulses,
-                  `Matched (of 6)` = matched, `Null mean` = fmt(null_mean, 1), p = fmtp(p)) |>
-  knitr::kable()
+#| label: fig-matches
+#| fig-cap: "Which abrupt Glas shifts match a GLAC-1D discharge pulse. Grey points: Glas δ¹⁸O samples; black line: 100-yr means. Bands: the six published events, spanning their 5–95 % ensemble age range (blue freshening, orange re-salinisation); solid bands are robust matches (same-sign pulse within ±300 yr in ≥ 80 % of age models), pale dashed bands are uncertain. Triangles at the bottom: GLAC-1D pulses above 1 SD (down: freshening, up: recovery). The line from each event to its nearest same-sign pulse is labelled with the offset on the published chronology and the match probability P."
+#| fig-width: 7
+#| fig-height: 4.2
+yr <- range(glas$d18O_measurement)
+y_pulse <- yr[1] - 0.75; y_link0 <- yr[1] - 0.25; y_lab0 <- yr[2] + 0.2
+mdf <- ev_pub |> mutate(robust = pm >= 0.8, col = ifelse(sign < 0, col_fresh, col_resal),
+                        lab = sprintf("%s\nP = %s", event, fmt(pm, 2)),
+                        olab = sprintf("%+d yr", round(offset)),
+                        lvl = (seq_len(n()) - 1) %% 2,            # alternate two label levels
+                        y_lab = y_lab0 + 0.42 * lvl, y_link = y_link0 - 0.25 * lvl)
+pl_win <- pulses |> filter(age >= win[1] - 300, age <= win[2] + 300)
+ggplot() +
+  geom_rect(data = mdf, aes(xmin = ens_lo / 1000, xmax = ens_hi / 1000, ymin = -Inf, ymax = Inf, fill = col,
+                            alpha = robust, linetype = robust), colour = NA) +
+  geom_rect(data = mdf |> filter(!robust), aes(xmin = ens_lo / 1000, xmax = ens_hi / 1000, ymin = y_link0 + 0.1, ymax = yr[2] + 0.1,
+                                               colour = col), fill = NA, linetype = "22", linewidth = 0.35) +
+  geom_point(data = glas, aes(interp_age / 1000, d18O_measurement), size = 0.35, colour = "grey65") +
+  geom_line(data = gb, aes(age / 1000, d), linewidth = 0.45) +
+  geom_point(data = pl_win, aes(age / 1000, y_pulse, shape = factor(sign), colour = ifelse(sign < 0, col_fresh, col_resal)),
+             size = 2, fill = NA) +
+  geom_segment(data = mdf, aes(x = age_pub / 1000, xend = pulse / 1000, y = y_link, yend = y_link, colour = col),
+               linewidth = 0.6, arrow = arrow(length = unit(3, "pt"), type = "closed")) +
+  geom_text(data = mdf, aes((age_pub + pulse) / 2000, y_link + 0.13, label = olab), size = 2.3, colour = "grey25") +
+  geom_text(data = mdf, aes(age_pub / 1000, y_lab, label = lab, fontface = ifelse(robust, "bold", "plain")),
+            size = 2.4, lineheight = 0.9, vjust = 0) +
+  scale_fill_identity() + scale_colour_identity() +
+  scale_alpha_manual(values = c(`TRUE` = 0.35, `FALSE` = 0.1), guide = "none") +
+  scale_linetype_manual(values = c(`TRUE` = "solid", `FALSE` = "22"), guide = "none") +
+  scale_shape_manual(values = c("-1" = 25, "1" = 24), guide = "none") +
+  scale_x_reverse(breaks = seq(12, 24, 1), limits = c(win[2] / 1000 + 0.35, win[1] / 1000 - 0.3)) +
+  scale_y_continuous(limits = c(y_pulse - 0.15, y_lab0 + 0.42 + 0.5), breaks = seq(-5, -1, 0.5)) +
+  labs(x = "Age (ka BP)", y = expression("Glas" ~ delta^18*O ~ "(‰)")) + theme_ms
 ```
+
+@tbl-sens shows that significance depends on the tolerance. At ±200–300 yr
+no combination reaches p < 0.05. At ±500 yr the median count is significant
+for every threshold (p = `r paste(fmtp(sens$p[sens$tol == 500]), collapse = ", ")`).
+The offset scan (@fig-scan) shows that shifting the discharge by a few hundred
+years changes the median count between `r min(scan$med)` and `r max(scan$med)`,
+with no single offset clearly preferred. The alignment is therefore
+detectable at the ~500-yr scale, which is also the scale of the combined
+chronological uncertainty, but not at the centennial scale.
+
+**Objective events.** Only `r n_bp` mean-shift breakpoint in Glas δ¹⁸O
+exceeds what AR(1) noise produces: a
+`r ifelse(ev_obj$sign[1] < 0, "freshening", "re-salinisation")` step of
+`r fmt(ev_obj$jump[1])` ‰ at `r ka(ev_obj$age_pub[1], 2)` ka, the published
+17.8kS onset. It lies `r fmt(abs(ev_obj$age_pub[1] - ev_obj$pulse[1]), 0)` yr
+from the nearest GLAC-1D freshening pulse and is matched within ±300 yr in
+`r fmt(100 * r_obj$pm[1], 0)` % of age models. The other published events are
+real features of Glas, but none improves the segmentation more than red noise
+with the same persistence would. The surrogate test is
+conservative, because the persistence estimate includes the steps themselves.
 
 ```{r}
 #| label: tbl-events
-#| tbl-cap: "Abrupt Glas δ¹⁸O events and the nearest same-sign pulse in the GLAC-1D total anomaly. Sign: −1 freshening, +1 re-salinisation. Offset is Glas age minus pulse age (positive: Glas earlier). Matched: |offset| ≤ 300 yr."
-em |> transmute(Event = event, Source = source,
-                `Midpoint (ka)` = ka(mid),
-                `95 % CI (ka)` = ifelse(is.na(lo), "", paste0(ka(lo), "–", ka(hi))),
-                Sign = sign, `Nearest pulse (ka)` = ifelse(is.na(pulse_age), "", ka(pulse_age)),
-                `Offset (yr)` = ifelse(is.na(lead), "", fmt(lead, 0)),
-                Matched = ifelse(matched, "yes", "no")) |>
+#| tbl-cap: "Published abrupt δ¹⁸O events in Glas (Endres et al., 2026a, Table 1) and the nearest same-sign GLAC-1D pulse. Sign: −1 freshening, +1 re-salinisation. Age and offset on the published chronology, with the 5–95 % range over the Bchron ensemble in brackets. Offset: Glas age minus pulse age (positive: Glas earlier). P(match): fraction of age models with |offset| ≤ 300 yr. Where the offset range spans both signs, the nearest pulse changes between age models."
+ev_pub |> transmute(Event = event, Sign = sign, `Depth (mm)` = fmt(depth, 2),
+                    `Age (ka)` = paste0(ka(age_pub, 2), " (", ka(ens_lo, 2), "–", ka(ens_hi, 2), ")"),
+                    `Pulse (ka)` = ka(pulse, 2),
+                    `Offset (yr)` = paste0(fmt(offset, 0), " (", fmt(off_lo, 0), " to ", fmt(off_hi, 0), ")"),
+                    `P(match)` = fmt(pm, 2)) |>
   knitr::kable()
 ```
 
 ```{r}
-#| label: fig-events
-#| fig-cap: "Glas δ¹⁸O (top; points are samples, line is the 100-yr bin mean) and the total source anomaly of GLAC-1D (middle) and ICE-6G (bottom). Dashed lines: δ¹⁸O events of Endres et al. (2026a), blue = freshening, red = re-salinisation. Triangles: GLAC-1D pulses (down = freshening, up = recovery)."
+#| label: tbl-sens
+#| tbl-cap: "Sensitivity of event matching (six published events) to the pulse threshold (k SD of 100-yr changes in the GLAC-1D total anomaly) and the tolerance. Matched: median and 5–95 % range over the age ensemble. Null mean and p from 2,000 random placements. Sig. models: fraction of age models with p < 0.05."
+sens |> transmute(`k (SD)` = k, `Tolerance (yr)` = tol, Pulses = n_pulses,
+                  `Matched (of 6)` = paste0(mc_med, " (", mc_lo, "–", mc_hi, ")"),
+                  `Null mean` = fmt(null_mean, 1), p = fmtp(p), `Sig. models (%)` = fmt(100 * p_frac, 0)) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: fig-series
+#| fig-cap: "Glas δ¹⁸O (top; grey points on the published chronology, black line 100-yr means) and the total source anomaly of GLAC-1D (middle) and ICE-6G (bottom). Shaded bars: published events, spanning the 5–95 % ensemble age range (blue freshening, orange re-salinisation). Triangles: GLAC-1D pulses above 1 SD (down: freshening, up: recovery)."
 #| fig-width: 7
-#| fig-height: 6.5
-xl <- c(win[2] / 1000 + 0.3, win[1] / 1000 - 0.3)
-xbr <- seq(12, 24, 2)
-evl <- geom_vline(data = ev_tab, aes(xintercept = mid / 1000, colour = factor(sign)),
-                  linetype = "dashed", linewidth = 0.4)
-colsc <- scale_colour_manual(values = c("-1" = "#1f5f99", "1" = "#b2182b"), guide = "none")
-p1 <- ggplot() + evl +
-  geom_point(data = glas, aes(interp_age / 1000, d18O_measurement), size = 0.5, colour = "grey55") +
-  geom_line(data = wg, aes(age / 1000, d18O), colour = "black") +
-  colsc + scale_x_reverse(limits = xl, breaks = xbr) +
-  labs(x = NULL, y = expression(Glas~delta^18*O~"(‰)")) + theme_bw(base_size = 10)
-p2 <- ggplot() + evl +
-  geom_line(data = tot |> filter(recon == "GLAC-1D"), aes(age / 1000, tot), colour = "black") +
-  geom_point(data = pulses, aes(age / 1000, dA * 0 + ifelse(sign < 0, -26, 1),
-                                shape = factor(sign)), size = 2.2, colour = "black") +
-  scale_shape_manual(values = c("-1" = 25, "1" = 24), guide = "none") +
-  colsc + scale_x_reverse(limits = xl, breaks = xbr) +
-  labs(x = NULL, y = "GLAC-1D anomaly (‰)") + theme_bw(base_size = 10)
-p3 <- ggplot() + evl +
-  geom_line(data = tot |> filter(recon == "ICE-6G"), aes(age / 1000, tot), colour = "black") +
-  colsc + scale_x_reverse(limits = xl, breaks = xbr) +
-  labs(x = "Age (ka BP)", y = "ICE-6G anomaly (‰)") + theme_bw(base_size = 10)
+#| fig-height: 6.2
+xl <- c(win[2] / 1000 + 0.4, win[1] / 1000 - 0.4)
+evr <- geom_rect(data = ev_pub, aes(xmin = ens_lo / 1000, xmax = ens_hi / 1000, ymin = -Inf, ymax = Inf,
+                                    fill = factor(sign)), alpha = 0.35, inherit.aes = FALSE)
+fl <- scale_fill_manual(values = c("-1" = col_fresh, "1" = col_resal), guide = "none")
+xs <- scale_x_reverse(limits = xl, breaks = seq(12, 24, 2))
+p1 <- ggplot() + evr + fl +
+  geom_point(data = glas, aes(interp_age / 1000, d18O_measurement), size = 0.4, colour = "grey60") +
+  geom_line(data = gb, aes(age / 1000, d), linewidth = 0.4) + xs +
+  labs(x = NULL, y = expression("Glas" ~ delta^18*O ~ "(‰)")) + theme_ms
+tg_w <- tot |> filter(recon == "GLAC-1D", age >= win[1] - 400, age <= win[2] + 400)
+p2 <- ggplot() + evr + fl +
+  geom_line(data = tg_w, aes(age / 1000, tot), linewidth = 0.4) +
+  geom_point(data = pulses |> filter(age >= win[1] - 400, age <= win[2] + 400),
+             aes(age / 1000, ifelse(sign < 0, min(tg_w$tot) - 1.5, max(tg_w$tot) + 1.5), shape = factor(sign)),
+             size = 1.8, fill = "black") +
+  scale_shape_manual(values = c("-1" = 25, "1" = 24), guide = "none") + xs +
+  labs(x = NULL, y = "GLAC-1D anomaly (‰)") + theme_ms
+p3 <- ggplot() + evr + fl +
+  geom_line(data = tot |> filter(recon == "ICE-6G", age >= win[1] - 500, age <= win[2] + 500),
+            aes(age / 1000, tot), linewidth = 0.4) + xs +
+  labs(x = "Age (ka BP)", y = "ICE-6G anomaly (‰)") + theme_ms
 p1 / p2 / p3
 ```
 
+```{r}
+#| label: fig-scan
+#| fig-cap: "Number of the six published Glas events matched by a same-sign GLAC-1D pulse within ±300 yr when the discharge series is shifted in time (positive: discharge moved older). Points: published chronology. Line and band: median and 5–95 % range over the age ensemble. Dashed line: mean of the random-placement null."
+#| fig-width: 5.5
+#| fig-height: 3
+ggplot(scan, aes(delta)) +
+  geom_ribbon(aes(ymin = lo, ymax = hi), fill = "#cde2fb") +
+  geom_line(aes(y = med), colour = "#184f95", linewidth = 0.6) +
+  geom_point(aes(y = pub), size = 1.4) +
+  geom_hline(yintercept = mean(nr_pub), linetype = "dashed", colour = ink2, linewidth = 0.3) +
+  scale_y_continuous(limits = c(0, 6), breaks = 0:6) +
+  labs(x = "Shift of discharge series (yr)", y = "Events matched (of 6)") + theme_ms
+```
+
+```{r}
+#| label: b3-sea
+rel_bins <- seq(-500, 1000, 100); rb <- rel_bins[-length(rel_bins)]
+sea_one <- function(ages_m, pl_ages) {
+  comp <- sapply(pl_ages, function(ap) {
+    b <- findInterval(ap - ages_m, rel_bins); ok <- b >= 1 & b <= length(rb)
+    v <- tapply(glas$d18O_measurement[ok], factor(b[ok], levels = seq_along(rb)), mean)
+    v - mean(v[rb < 0], na.rm = TRUE) })
+  rowMeans(comp, na.rm = TRUE)
+}
+sea_stat <- function(comp) mean(comp[rb >= 100 & rb <= 500])
+pf <- pulses$age[pulses$sign == -1 & pulses$age > win[1] + 500 & pulses$age < win[2] - 1000]
+pr <- pulses$age[pulses$sign ==  1 & pulses$age > win[1] + 500 & pulses$age < win[2] - 1000]
+sea_f <- sapply(seq_len(N), function(m) sea_one(A[m, ], pf))
+sea_r <- sapply(seq_len(N), function(m) sea_one(A[m, ], pr))
+null_comp <- function(np, B = 2000) replicate(B, sea_one(glas$interp_age, runif(np, win[1] + 500, win[2] - 1000)))
+nc_f <- null_comp(length(pf)); nc_r <- null_comp(length(pr))
+sf <- apply(sea_f, 2, sea_stat); sr <- apply(sea_r, 2, sea_stat)
+nf <- apply(nc_f, 2, sea_stat); nr <- apply(nc_r, 2, sea_stat)
+p_sf <- mean(nf <= median(sf)); p_sr <- mean(nr >= median(sr))
+```
+
+**Superposed epoch analysis.** Composited around the
+`r length(pf)` GLAC-1D freshening pulses, Glas δ¹⁸O changes by
+`r fmt(median(sf), 3)` ‰ on average 100–600 yr after the pulse (ensemble
+5–95 %: `r rng(sf, 3)` ‰), indistinguishable from random pulse times
+(one-sided p = `r fmtp(p_sf)`; @fig-sea). Around the `r length(pr)`
+recoveries Glas changes by `r fmt(median(sr), 3)` ‰ (`r rng(sr, 3)` ‰), the
+opposite of the expected re-salinisation (p = `r fmtp(p_sr)` for a positive
+response). On average, the GLAC-1D pulses leave no detectable imprint in Glas
+at centennial scale. The robust event matches above are therefore specific
+coincidences, not a systematic response.
+
+```{r}
+#| label: fig-sea
+#| fig-cap: "Superposed epoch composites of Glas δ¹⁸O around GLAC-1D freshening pulses (left) and recoveries (right), relative to the 500-yr pre-pulse mean. Line and blue band: median and 5–95 % range over the age ensemble. Grey band: 5–95 % range for random pulse times."
+#| fig-width: 6.5
+#| fig-height: 2.8
+sea_df <- bind_rows(
+  tibble(type = "Freshening pulses", t = rb + 50, med = apply(sea_f, 1, median),
+         lo = apply(sea_f, 1, quantile, 0.05), hi = apply(sea_f, 1, quantile, 0.95),
+         nlo = apply(nc_f, 1, quantile, 0.05, na.rm = TRUE), nhi = apply(nc_f, 1, quantile, 0.95, na.rm = TRUE)),
+  tibble(type = "Recoveries", t = rb + 50, med = apply(sea_r, 1, median),
+         lo = apply(sea_r, 1, quantile, 0.05), hi = apply(sea_r, 1, quantile, 0.95),
+         nlo = apply(nc_r, 1, quantile, 0.05, na.rm = TRUE), nhi = apply(nc_r, 1, quantile, 0.95, na.rm = TRUE)))
+ggplot(sea_df, aes(t)) +
+  geom_ribbon(aes(ymin = nlo, ymax = nhi), fill = "grey88") +
+  geom_ribbon(aes(ymin = lo, ymax = hi), fill = "#86b6ef", alpha = 0.6) +
+  geom_hline(yintercept = 0, linewidth = 0.3) + geom_vline(xintercept = 0, linewidth = 0.3, linetype = "dashed") +
+  geom_line(aes(y = med), colour = "#184f95", linewidth = 0.6) +
+  facet_wrap(~type) + labs(x = "Time after pulse (yr)", y = expression("Glas" ~ Delta*delta^18*O ~ "(‰)")) + theme_ms
+```
+
+```{r}
+#| label: b4-detect
+Dg <- approx(tD, Y_hp[, "Total"], xout = tG)$y
+snr <- c(0.05, 0.1, 0.2, 0.3, 0.5)
+det <- sapply(snr, function(s) {
+  e <- ar1_irreg(tG, p_hp$tau, 100)
+  apply(e, 2, function(z) kxcf(tG, zs(sqrt(s) * Dg + sqrt(1 - s) * z), tD, Y_hp[, "Total"], 0, h_k)) })
+r_obs0 <- obs_hp[lags == 0, "Total"]
+frac_below <- colMeans(det <= quantile(ens_hp0[1, ], 0.95))
+```
+
+**Detectability.** If the high-passed GLAC-1D total explained a fraction of
+the centennial Glas variance, the zero-lag correlation would be positive
+(@tbl-detect). A signal fraction of 10 % already gives a median r of
+`r fmt(median(det[, 2]))`. The observed ensemble range
+(`r rng(ens_hp0[1, ])`) lies below the 5th percentile of the synthetic
+correlations for every signal fraction of `r fmt(100 * snr[min(which(apply(det, 2, quantile, 0.05) > quantile(ens_hp0[1, ], 0.95)))], 0)` % and more. At zero lag, the
+GLAC-1D forcing is therefore not a detectable component of centennial Glas
+variability, even allowing for the age uncertainty.
+
+```{r}
+#| label: tbl-detect
+#| tbl-cap: "Zero-lag kernel correlation expected between synthetic Glas series (signal fraction of the variance from the high-passed GLAC-1D total, remainder AR(1) noise with Glas persistence) and the GLAC-1D total, from 100 realisations each. Observed: 5–95 % range over the age ensemble."
+tibble(`Signal fraction (%)` = c(fmt(100 * snr, 0), "Observed"),
+       `Median r` = c(fmt(apply(det, 2, median)), fmt(median(ens_hp0[1, ]))),
+       `5–95 % range` = c(apply(det, 2, rng), rng(ens_hp0[1, ]))) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: b5-ice6g
+i6 <- tot |> filter(recon == "ICE-6G", age >= win[1], age <= win[2]) |> arrange(desc(age))
+g500b <- glas |> mutate(age = round(interp_age / 500) * 500) |> group_by(age) |> summarise(d = mean(d18O_measurement))
+j6 <- inner_join(i6, g500b, by = "age")
+r6_lv <- cor(j6$tot, j6$d); r6_df <- cor(diff(j6$tot), diff(j6$d))
+```
+
+**ICE-6G.** With `r nrow(j6)` 500-yr steps in the Glas interval, Glas
+correlates with the ICE-6G total at r = `r fmt(r6_lv)` on levels, but at
+r = `r fmt(r6_df)` on 500-yr changes. The level correlation reflects the
+shared deglacial trend. ICE-6G ramps up smoothly towards Meltwater Pulse 1A
+and has no centennial structure to align with the Glas events (@fig-series).
+
 # Answer
 
-**Most important source region.** It depends on the ice-sheet reconstruction.
-Within the Glas interval (`r ka(win[1])`–`r ka(win[2])` ka), GLAC-1D gives
-`r imp_g$name` (`r fmt(imp_g$share, 0)` % of the summed source anomaly), with
-EIS_Arctic and LAU_Arctic almost equal, and the European sectors together
-provide `r gs("GLAC-1D", "European")` %. ICE-6G gives `r imp_i$name`
-(`r fmt(imp_i$share, 0)` %), with the Laurentide sectors providing
-`r gs("ICE-6G", "Laurentide")` %. Over the full series both reconstructions
-put a Laurentide sector first (`r impf_g$name` and `r impf_i$name`).
+**Most important source region.** It depends on the ice-sheet
+reconstruction. Within the Glas interval, GLAC-1D has three nearly equal
+contributors, `r top3$region[1]`, `r top3$region[2]` and `r top3$region[3]`
+(`r fmt(100 * top3$share[3], 0)`–`r fmt(100 * top3$share[1], 0)` % each of the
+summed source anomaly), with European sectors supplying
+`r gs("GLAC-1D", "European")` %. ICE-6G gives
+`r imp(s_win, "ICE-6G")$region` (`r fmt(100 * imp(s_win, "ICE-6G")$share, 0)` %),
+with Laurentide sectors supplying `r gs("ICE-6G", "Laurentide")` %. Over the
+full series, both reconstructions put `r imp(s_full, "GLAC-1D")$region` first.
+Weighted by transport to NISA, the answer shifts toward regions that reach the
+cave efficiently. In GLAC-1D, `r nt("GLAC-1D", "cold")$region` becomes the
+most important region at NISA (`r fmt(100 * min(nisa_top$share[nisa_top$recon == "GLAC-1D"]), 0)`–`r fmt(100 * max(nisa_top$share[nisa_top$recon == "GLAC-1D"]), 0)` %
+of the site anomaly in the two AMOC modes). In ICE-6G it remains
+`r nt("ICE-6G", "cold")$region`
+(`r fmt(100 * min(nisa_top$share[nisa_top$recon == "ICE-6G"]), 0)`–`r fmt(100 * max(nisa_top$share[nisa_top$recon == "ICE-6G"]), 0)` %).
 
-**Most variable source region.** `r var_g$name` in GLAC-1D
-(SD `r fmt(var_g$sd)` ‰ over the Glas interval; EIS_Arctic is a close second)
-and `r var_i$name` in ICE-6G (SD `r fmt(var_i$sd)` ‰). In both cases the
-variability comes from a small number of large, short pulses.
+**Most variable source region.** In GLAC-1D it is
+`r var_(s_win, "GLAC-1D")$region`, which has the largest SD and
+`r fmt(100 * vsh(s_win, "GLAC-1D")$vshare, 0)` % of the variance of the total
+anomaly. In ICE-6G, `r var_(s_win, "ICE-6G")$region` and
+`r vsh(s_win, "ICE-6G")$region` share this role. In both reconstructions the
+variability comes from a few short pulses. At NISA, after transport
+weighting, the most variable contribution is
+`r nt("GLAC-1D", "cold", nisa_var)$region` in GLAC-1D and
+`r nt("ICE-6G", "cold", nisa_var)$region` in ICE-6G.
 
-**Alignment with Glas.** Level correlations are weak to moderate
-(r = `r fmt(tot_g$r_obs)` with GLAC-1D, `r fmt(tot_i$r_obs)` with ICE-6G) and
-not significant against red-noise surrogates; the highest regional
-correlation is with `r best_g$series`. Two quantifications do show
-structure: (i) the lead–lag cross-correlation with GLAC-1D peaks with Glas
-leading by about `r abs(cc_max$lag)` yr (r = `r fmt(cc_max$r)`, within the
-red-noise envelope), and (ii) `r n_obs` of the six published abrupt Glas
-events have a same-sign GLAC-1D pulse within ±300 yr, against
-`r fmt(nm_mean, 1)` expected by chance (p = `r fmtp(p_ev)`), with offsets
-between `r fmt(off_rng[1], 0)` and `r fmt(off_rng[2], 0)` yr; widening the
-tolerance to ±500 yr matches `r (sens |> filter(mult == 2, tol == 500))$matched`
-of six events against the `r (sens |> filter(mult == 2, tol == 500))$n_pulses`
-largest pulses (p = `r fmtp((sens |> filter(mult == 2, tol == 500))$p)`), so
-the coincidence is significant at the ~500-yr but not the centennial
-scale. The alignment
-is event-specific: the three Heinrich Stadial 1 freshening events match
-GLAC-1D pulses to within a few hundred years, the 17.8 ka onset lags the
-GLAC-1D Arctic pulse by ~`r fmt(-em_t1$lead[em_t1$event == "17.8kS"], 0)` yr,
-and the 14.7 ka re-salinisation coincides with Meltwater Pulse 1A with
-opposite sign. The appropriate quantification is therefore event-level
-matching (offset per event, plus a Monte-Carlo null for the match count)
-rather than correlation of the series, and, for a physically consistent
-test, the comparison should be made with the convolved forward-model output
-at NISA, which carries the AMOC-state dependence that explains the
-opposite-sign case.
+**Alignment with Glas.** Glas and the discharge share millennial structure
+and several individual events. There is no systematic centennial response.
 
-**Caveats.** The anomaly columns are the forward model's forcing: source-region
-anomalies that scale with discharge divided by region volume. They do not
-include the transport from each region to NISA, which Endres et al. (2026b)
-and the forward-model draft show is weak for the Arctic sectors and strong
-for the Bay of Biscay and Norwegian Sea sectors, nor the AMOC-mode dependence
-of the kernels. Weighting by that transport would shift the "most important"
-ranking further toward the European sectors. The event analysis uses the
-GLAC-1D series only, because the 500-yr resolution of ICE-6G is coarser than
-the events themselves.
+- *Levels.* Glas follows the millennial evolution of EIS_NorwegianSea
+  (r = `r fmt(obs_lv["EIS_NorwegianSea"])`) and anti-follows EIS_BayOfBiscay
+  (r = `r fmt(obs_lv["EIS_BayOfBiscay"])`). Both are robust to age uncertainty,
+  but neither is significant against red noise
+  (p = `r fmtp(p_lv0[series == "EIS_NorwegianSea"])` and `r fmtp(p_lv0[series == "EIS_BayOfBiscay"])`).
+- *Centennial correlation.* High-passed Glas and GLAC-1D are not positively
+  correlated at zero lag (ensemble `r rng(ens_hp0[1, ])`). The best lead–lag
+  has Glas leading by `r fmt(-lags[obs_pk], 0)` yr on the published chronology
+  (`r fmt(-median(ens_pk_lag), 0)` yr ensemble median), but it is not significant once the search over lags is accounted for
+  (family-wise p = `r fmtp(p_fw_tot)`).
+- *Events.* `r median(r_pub$mc)` of the six published abrupt events have a
+  same-sign GLAC-1D pulse within ±300 yr (ensemble range
+  `r min(r_pub$mc)`–`r max(r_pub$mc)`; p = `r fmtp(p_pub)`). The count becomes
+  significant at ±500 yr (p ≤ `r fmtp(max(sens$p[sens$tol == 500]))`). The
+  three Heinrich Stadial 1 freshening steps and the 23.4 ka re-salinisation
+  match in ≥ 80 % of age models. The 17.8 ka onset, the only step that
+  exceeds red noise, follows a GLAC-1D freshening pulse by
+  ~`r fmt(round(-ev_pub$offset[ev_pub$event == "17.8kS"], -1), 0)` yr. The 14.7 ka
+  re-salinisation coincides with Meltwater Pulse 1A, the opposite sign.
+
+**How to quantify it.** The appropriate quantification is event-based and
+carried through an age-model ensemble: per-event match probabilities and
+offsets, a match count tested against random placement, and a
+superposed-epoch composite that tests for a systematic response. Correlation
+of the full series mainly measures the shared trend. Correlations of
+high-passed series must be tested with a family-wise null over lags and
+regions and with surrogates for both series. With a ±150–200 yr age
+uncertainty in Glas and an unquantified uncertainty in the ice-sheet
+chronologies, centennial alignment cannot be demonstrated from these data;
+alignment at the ~500-yr scale can.
+
+# Caveats
+
+- **Equilibrium transport, one AMOC mode at a time.** The alignment tests
+  use the source-region forcing. The site anomalies use equilibrium
+  transport weights (Endres et al., 2026b), which ignore transit times and
+  hold the AMOC mode fixed. The forward-model draft (in prep.) switches modes
+  through the deglaciation and reproduces the 14.7 ka case as AMOC recovery
+  cancelling the Meltwater Pulse 1A anomaly at NISA, which neither approach
+  here can capture. The most direct test would compare Glas with the
+  convolved NISA series, which is not in the repository.
+- **Discharge chronology.** The ice-sheet reconstructions have their own age
+  uncertainty, which is only bracketed here by the offset scan.
+- **Glas δ¹⁸O is not only seawater.** It also records temperature, moisture
+  source and the global-ocean deglacial trend, which lowers the expected
+  correlation.
+- **Ensemble sizes.** `r fmt(N, 0)` Bchron age models were used for event statistics
+  and 200 for cross-correlations. Surrogate counts of 300 limit p values to
+  a resolution of about 0.003.
 
 # References
 
 Endres, L., Pérez-Mejías, C., Ivanovic, R., Gregoire, L., Hughes, A. L. C.,
-Cheng, H., & Stoll, H. (2026a). Interplay of North Atlantic freshening and deep
-convection during the last deglaciation constrained by Iberian speleothems.
-*Climate of the Past*, 22(4), 797–824. https://doi.org/10.5194/cp-22-797-2026
+Cheng, H., and Stoll, H. (2026a). Interplay of North Atlantic freshening and
+deep convection during the last deglaciation constrained by Iberian
+speleothems. *Climate of the Past*, 22, 797–824.
+https://doi.org/10.5194/cp-22-797-2026
 
 Endres, L., Ivanovic, R., Rome, Y., Tindall, J., Thurnherr, I., Sprenger, M.,
-& Stoll, H. (2026b). Tracing meltwater from northern ice sheets to
+and Stoll, H. (2026b). Tracing meltwater from northern ice sheets to
 palaeoclimate archives during the early last deglaciation: a conservative
 tracer approach. *ESS Open Archive* (preprint).
 https://doi.org/10.22541/essoar.15007256/v1
 
-Endres, L., Ivanovic, R., Rome, Y., & Stoll, H. (in prep.). A dye tracer
+Endres, L., Ivanovic, R., Rome, Y., and Stoll, H. (in prep.). A dye tracer
 forward-model for meltwater-related surface ocean anomalies. Draft
 (`Impulse_Response_Revisions_v1.pdf`, this repository).
+
+Franke, J. G., and Donner, R. V. (2019). Correlating paleoclimate time series:
+sources of uncertainty and potential pitfalls. *Quaternary Science Reviews*.
+Preprint: https://arxiv.org/abs/1903.11865
+
+Haslett, J., and Parnell, A. (2008). A simple monotone process with
+application to radiocarbon-dated depth chronologies. *Journal of the Royal
+Statistical Society C*, 57, 399–418.
+
+Rehfeld, K., and Kurths, J. (2014). Similarity estimators for irregular and
+age-uncertain time series. *Climate of the Past*, 10, 107–122.
+https://doi.org/10.5194/cp-10-107-2014
+
+Rehfeld, K., Marwan, N., Heitzig, J., and Kurths, J. (2011). Comparison of
+correlation analysis techniques for irregularly sampled time series.
+*Nonlinear Processes in Geophysics*, 18, 389–404.
+https://doi.org/10.5194/npg-18-389-2011
+
+Schulz, M., and Mudelsee, M. (2002). REDFIT: estimating red-noise spectra
+directly from unevenly spaced paleoclimatic time series. *Computers &
+Geosciences*, 28, 421–426.
+
+Theiler, J., Eubank, S., Longtin, A., Galdrikian, B., and Farmer, J. D.
+(1992). Testing for nonlinearity in time series: the method of surrogate
+data. *Physica D*, 58, 77–94.
+
+Zeileis, A., Leisch, F., Hornik, K., and Kleiber, C. (2002). strucchange: an R
+package for testing for structural change in linear regression models.
+*Journal of Statistical Software*, 7(2), 1–38.
