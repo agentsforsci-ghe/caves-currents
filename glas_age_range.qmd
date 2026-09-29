@@ -1,0 +1,155 @@
+---
+title: "Age range of stalagmite Glas (La Vallina cave, northern Iberia)"
+author: "Laura Endres"
+date: today
+format:
+  docx:
+    toc: false
+    fig-dpi: 300
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+dat <- function(f) read_csv(file.path("data", f), show_col_types = FALSE)
+
+entity  <- dat("entity.csv")
+site    <- dat("site.csv")
+sample  <- dat("sample.csv")
+orig    <- dat("original_chronology.csv")
+sisal   <- dat("sisal_chronology.csv")
+dating  <- dat("dating.csv")
+hiatus  <- dat("hiatus.csv")
+d18O    <- dat("d18O.csv")
+ref     <- dat("reference.csv")
+ent_ref <- dat("entity_link_reference.csv")
+
+glas <- entity |> filter(entity_name == "Glas")
+glas_site <- site |> filter(site_id == glas$site_id)
+
+glas_samples <- sample |>
+  filter(entity_id == glas$entity_id) |>
+  inner_join(orig, by = "sample_id") |>
+  arrange(interp_age)
+
+glas_dates <- dating |> filter(entity_id == glas$entity_id)
+glas_ref <- ent_ref |> filter(entity_id == glas$entity_id) |>
+  inner_join(ref, by = "ref_id")
+
+n_sisal  <- sisal |> filter(sample_id %in% glas_samples$sample_id) |> nrow()
+n_hiatus <- hiatus |> filter(sample_id %in% glas_samples$sample_id) |> nrow()
+n_d18O   <- d18O |> filter(sample_id %in% glas_samples$sample_id) |> nrow()
+
+young <- slice_min(glas_samples, interp_age, n = 1)
+old   <- slice_max(glas_samples, interp_age, n = 1)
+span  <- old$interp_age - young$interp_age
+res   <- median(diff(glas_samples$interp_age))
+max_step <- max(diff(glas_samples$interp_age))
+
+fmt  <- function(x) format(round(x), big.mark = ",")
+ka   <- function(x) sprintf("%.1f", x / 1000)
+```
+
+# Question
+
+What age range do the data from the NISA stalagmite *Glas* cover?
+
+# Data and methods
+
+The analysis uses the SISAL-format database excerpt in `data/`. Stalagmite
+*Glas* is entity `r glas$entity_id` (`r glas$persist_id`), from
+`r glas_site$site_name` cave (`r glas_site$latitude` °N,
+`r abs(glas_site$longitude)` °W, `r glas_site$elevation` m a.s.l.) in
+northern Iberia. The entity is linked to `r glas_ref$citation`
+
+The age range comes from the original, author-published chronology
+(`original_chronology.csv`, age model type: *`r unique(glas_samples$age_model_type)`*),
+joined to the entity's samples in `sample.csv`. No Glas samples have SISAL-generated chronologies in
+`sisal_chronology.csv` (`r n_sisal` rows), so the original age model is the only sample-level chronology available. The
+U–Th dates in `dating.csv` (`r nrow(glas_dates)` dates, all flagged
+`date_used = yes`) are used to check the age model. Ages are reported as years
+before present (BP, present = 1950 CE), the SISAL convention; the database
+excerpt's schema does not state units explicitly.
+
+# Results
+
+The Glas record contains `r nrow(glas_samples)` samples between
+`r young$depth_sample` mm and `r old$depth_sample` mm depth from the top.
+Each sample has δ^18^O (n = `r n_d18O`), δ^13^C, Mg/Ca and Sr/Ca
+measurements.
+
+**The data cover `r fmt(young$interp_age)` to `r fmt(old$interp_age)` years BP
+(about `r ka(young$interp_age)`–`r ka(old$interp_age)` ka), a span of
+`r fmt(span)` years.** This runs from the Last Glacial Maximum through the
+last deglaciation to the Younger Dryas / early Holocene transition.
+
+```{r}
+#| label: tbl-range
+#| tbl-cap: "Youngest and oldest samples of stalagmite Glas in the original (Bchron) chronology. Uncertainties are as given in the database (+ older / − younger)."
+bind_rows(young, old) |>
+  transmute(
+    Endpoint = c("Youngest (top)", "Oldest (base)"),
+    `Depth (mm)` = depth_sample,
+    `Age (yr BP)` = fmt(interp_age),
+    `+ uncert. (yr)` = round(interp_age_uncert_pos),
+    `− uncert. (yr)` = round(interp_age_uncert_neg)
+  ) |>
+  knitr::kable()
+```
+
+The record has no hiatuses (`r n_hiatus` entries in `hiatus.csv`). The median
+sampling resolution is `r res` years, and the largest step between
+consecutive samples is `r max_step` years. The U–Th dates span
+`r fmt(min(glas_dates$corr_age))`–`r fmt(max(glas_dates$corr_age))` years BP
+(`r min(glas_dates$depth_dating)`–`r max(glas_dates$depth_dating)` mm) and
+bracket the sampled interval (@fig-agedepth). The youngest date lies at
+`r min(glas_dates$depth_dating)` mm, above the uppermost isotope sample, so the
+stalagmite grew into the early Holocene. The measured data, however, stop at
+about `r ka(young$interp_age)` ka.
+
+```{r}
+#| label: fig-agedepth
+#| fig-cap: "Age–depth model of stalagmite Glas. The line and shading show the original Bchron chronology with its uncertainty envelope, and the points show U–Th dates with their uncertainties as given in the database. Dashed lines mark the age range covered by the sampled data."
+#| fig-width: 6
+#| fig-height: 4
+ggplot() +
+  geom_ribbon(
+    data = glas_samples,
+    aes(x = depth_sample,
+        ymin = (interp_age - interp_age_uncert_neg) / 1000,
+        ymax = (interp_age + interp_age_uncert_pos) / 1000),
+    fill = "grey80"
+  ) +
+  geom_line(data = glas_samples,
+            aes(depth_sample, interp_age / 1000), colour = "grey20") +
+  geom_errorbar(
+    data = glas_dates,
+    aes(x = depth_dating,
+        ymin = (corr_age - corr_age_uncert_neg) / 1000,
+        ymax = (corr_age + corr_age_uncert_pos) / 1000),
+    width = 0.4, colour = "#1f5f99"
+  ) +
+  geom_point(data = glas_dates, aes(depth_dating, corr_age / 1000),
+             colour = "#1f5f99", size = 1.8) +
+  geom_hline(yintercept = c(young$interp_age, old$interp_age) / 1000,
+             linetype = "dashed", linewidth = 0.3) +
+  labs(x = "Depth from top (mm)", y = "Age (ka BP)") +
+  theme_bw(base_size = 10)
+```
+
+# Answer
+
+The published data from stalagmite *Glas* (La Vallina cave, entity
+`r glas$entity_id`) cover **`r ka(young$interp_age)` to `r ka(old$interp_age)`
+ka BP** (`r fmt(young$interp_age)`–`r fmt(old$interp_age)` years BP; about
+`r ka(span)` kyr). This range is based on `r nrow(glas_samples)` continuously
+sampled δ^18^O, δ^13^C and trace-element measurements on the original Bchron
+age model. Allowing for the age-model uncertainties at the endpoints, the range
+widens to about `r ka(young$interp_age - young$interp_age_uncert_neg)`–`r ka(old$interp_age + old$interp_age_uncert_pos)` ka.
