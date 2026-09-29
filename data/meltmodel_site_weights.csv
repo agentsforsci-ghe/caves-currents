@@ -1,0 +1,163 @@
+site,type,lat,lon,amoc_mode,region,weight
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,EIS_MedSea,0.00286094
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,EIS_BayOfBiscay,0.0382963
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,EIS_NorwegianSea,0.0433021
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,EIS_Arctic,0.0112625
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,LAU_Arctic,0.017595
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,GIS_GreenlandSea,0.0194238
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,LAU_LabradorSea,0.0272826
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,LAU_StLawrence,0.0187159
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,cold,LAU_GulfOfMexico,0.0203652
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,EIS_MedSea,0.00253938
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,EIS_BayOfBiscay,0.0334614
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,EIS_NorwegianSea,0.0665535
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,EIS_Arctic,0.0287465
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,LAU_Arctic,0.0439895
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,GIS_GreenlandSea,0.0203295
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,LAU_LabradorSea,0.0242467
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,LAU_StLawrence,0.0170788
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,cold,LAU_GulfOfMexico,0.0186217
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,EIS_MedSea,0.00291739
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,EIS_BayOfBiscay,0.0306948
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,EIS_NorwegianSea,0.0381877
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,EIS_Arctic,0.016675
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,LAU_Arctic,0.0257143
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,GIS_GreenlandSea,0.0442364
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,LAU_LabradorSea,0.0228115
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,LAU_StLawrence,0.017969
+MD03-2664,Marine Sediment Core,57.4333,-48.6,cold,LAU_GulfOfMexico,0.0197212
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,EIS_MedSea,0.0030168
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,EIS_BayOfBiscay,0.0342004
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,EIS_NorwegianSea,0.0215589
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,EIS_Arctic,0.00913646
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,LAU_Arctic,0.0141205
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,GIS_GreenlandSea,0.0224625
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,LAU_LabradorSea,0.0298117
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,LAU_StLawrence,0.0189445
+ODP980,Marine Sediment Core,55.4833,-14.7,cold,LAU_GulfOfMexico,0.0204118
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,EIS_MedSea,0.00290465
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,EIS_BayOfBiscay,0.0635492
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,EIS_NorwegianSea,0.0118713
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,EIS_Arctic,0.00492735
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,LAU_Arctic,0.00758884
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,GIS_GreenlandSea,0.0127194
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,LAU_LabradorSea,0.0193776
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,LAU_StLawrence,0.0186499
+MD95-2042,Marine Sediment Core,37.8,-10.1667,cold,LAU_GulfOfMexico,0.0211601
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,EIS_MedSea,0.00056863
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,EIS_BayOfBiscay,0.00343936
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,EIS_NorwegianSea,0.00138329
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,EIS_Arctic,0.000499977
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,LAU_Arctic,0.000748807
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,GIS_GreenlandSea,0.00146403
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,LAU_LabradorSea,0.00208953
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,LAU_StLawrence,0.00839338
+MD02-2552,Marine Sediment Core,26.95,-91.35,cold,LAU_GulfOfMexico,0.0690316
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,EIS_MedSea,0.010196
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,EIS_BayOfBiscay,0.0322984
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,EIS_NorwegianSea,0.0109845
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,EIS_Arctic,0.00454407
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,LAU_Arctic,0.00700401
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,GIS_GreenlandSea,0.0114641
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,LAU_LabradorSea,0.0173944
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,LAU_StLawrence,0.0148302
+La Vallina (NISA),Speleothem,43.4167,-4.8,cold,LAU_GulfOfMexico,0.0170767
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,EIS_MedSea,0.000194922
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,EIS_BayOfBiscay,0.00126617
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,EIS_NorwegianSea,0.00051412
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,EIS_Arctic,0.000189548
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,LAU_Arctic,0.000285535
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,GIS_GreenlandSea,0.000545497
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,LAU_LabradorSea,0.000784808
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,LAU_StLawrence,0.00291416
+Cave Without a Name,Speleothem,29.8667,-98.6333,cold,LAU_GulfOfMexico,0.013591
+NGRIP,Ice Core,75.1,-42.3167,cold,EIS_MedSea,0.00198396
+NGRIP,Ice Core,75.1,-42.3167,cold,EIS_BayOfBiscay,0.0152576
+NGRIP,Ice Core,75.1,-42.3167,cold,EIS_NorwegianSea,0.0162394
+NGRIP,Ice Core,75.1,-42.3167,cold,EIS_Arctic,0.0071901
+NGRIP,Ice Core,75.1,-42.3167,cold,LAU_Arctic,0.0116111
+NGRIP,Ice Core,75.1,-42.3167,cold,GIS_GreenlandSea,0.0126849
+NGRIP,Ice Core,75.1,-42.3167,cold,LAU_LabradorSea,0.01403
+NGRIP,Ice Core,75.1,-42.3167,cold,LAU_StLawrence,0.00841711
+NGRIP,Ice Core,75.1,-42.3167,cold,LAU_GulfOfMexico,0.00898398
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,EIS_MedSea,0.00314108
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,EIS_BayOfBiscay,0.0163155
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,EIS_NorwegianSea,0.0131417
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,EIS_Arctic,0.00286264
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,LAU_Arctic,0.00461998
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,GIS_GreenlandSea,0.00692052
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,LAU_LabradorSea,0.0119846
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,LAU_StLawrence,0.012755
+MD95-2010,Marine Sediment Core,66.6833,-4.5667,zonal,LAU_GulfOfMexico,0.014932
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,EIS_MedSea,0.00302354
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,EIS_BayOfBiscay,0.0166017
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,EIS_NorwegianSea,0.0286016
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,EIS_Arctic,0.0148661
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,LAU_Arctic,0.0234948
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,GIS_GreenlandSea,0.0103563
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,LAU_LabradorSea,0.0125191
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,LAU_StLawrence,0.0126632
+PS2644-5,Marine Sediment Core,67.8667,-21.7667,zonal,LAU_GulfOfMexico,0.0147861
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,EIS_MedSea,0.00320327
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,EIS_BayOfBiscay,0.0156286
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,EIS_NorwegianSea,0.0140591
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,EIS_Arctic,0.00580144
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,LAU_Arctic,0.00920408
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,GIS_GreenlandSea,0.0336937
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,LAU_LabradorSea,0.0116303
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,LAU_StLawrence,0.0129785
+MD03-2664,Marine Sediment Core,57.4333,-48.6,zonal,LAU_GulfOfMexico,0.0151283
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,EIS_MedSea,0.0029694
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,EIS_BayOfBiscay,0.0178741
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,EIS_NorwegianSea,0.00673141
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,EIS_Arctic,0.00258839
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,LAU_Arctic,0.00409838
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,GIS_GreenlandSea,0.0107979
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,LAU_LabradorSea,0.0184701
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,LAU_StLawrence,0.0132917
+ODP980,Marine Sediment Core,55.4833,-14.7,zonal,LAU_GulfOfMexico,0.0151885
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,EIS_MedSea,0.00447903
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,EIS_BayOfBiscay,0.0039269
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,EIS_NorwegianSea,0.00114706
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,EIS_Arctic,0.000447569
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,LAU_Arctic,0.000678667
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,GIS_GreenlandSea,0.00155498
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,LAU_LabradorSea,0.00254029
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,LAU_StLawrence,0.0122342
+MD95-2042,Marine Sediment Core,37.8,-10.1667,zonal,LAU_GulfOfMexico,0.015773
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,EIS_MedSea,0.000337505
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,EIS_BayOfBiscay,0.000484693
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,EIS_NorwegianSea,0.000248201
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,EIS_Arctic,0.00010064
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,LAU_Arctic,0.000133182
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,GIS_GreenlandSea,0.000325597
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,LAU_LabradorSea,0.000390639
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,LAU_StLawrence,0.00553099
+MD02-2552,Marine Sediment Core,26.95,-91.35,zonal,LAU_GulfOfMexico,0.0479915
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,EIS_MedSea,0.00866582
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,EIS_BayOfBiscay,0.0159623
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,EIS_NorwegianSea,0.00320335
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,EIS_Arctic,0.00117622
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,LAU_Arctic,0.0018506
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,GIS_GreenlandSea,0.00506464
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,LAU_LabradorSea,0.00969222
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,LAU_StLawrence,0.0112708
+La Vallina (NISA),Speleothem,43.4167,-4.8,zonal,LAU_GulfOfMexico,0.0136059
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,EIS_MedSea,0.000158253
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,EIS_BayOfBiscay,0.000303434
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,EIS_NorwegianSea,0.000174434
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,EIS_Arctic,7.04566e-05
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,LAU_Arctic,0.000102771
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,GIS_GreenlandSea,0.000251937
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,LAU_LabradorSea,0.00040609
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,LAU_StLawrence,0.00326919
+Cave Without a Name,Speleothem,29.8667,-98.6333,zonal,LAU_GulfOfMexico,0.0129062
+NGRIP,Ice Core,75.1,-42.3167,zonal,EIS_MedSea,0.00256845
+NGRIP,Ice Core,75.1,-42.3167,zonal,EIS_BayOfBiscay,0.00859143
+NGRIP,Ice Core,75.1,-42.3167,zonal,EIS_NorwegianSea,0.0059256
+NGRIP,Ice Core,75.1,-42.3167,zonal,EIS_Arctic,0.00449137
+NGRIP,Ice Core,75.1,-42.3167,zonal,LAU_Arctic,0.00823288
+NGRIP,Ice Core,75.1,-42.3167,zonal,GIS_GreenlandSea,0.008076
+NGRIP,Ice Core,75.1,-42.3167,zonal,LAU_LabradorSea,0.0107137
+NGRIP,Ice Core,75.1,-42.3167,zonal,LAU_StLawrence,0.00725585
+NGRIP,Ice Core,75.1,-42.3167,zonal,LAU_GulfOfMexico,0.00818003

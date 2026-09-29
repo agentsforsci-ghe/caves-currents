@@ -25,10 +25,14 @@ ka   <- function(x, d = 1) formatC(x / 1000, format = "f", digits = d)
 fmtp <- function(p) ifelse(p < 0.001, "< 0.001", sprintf("%.3f", p))
 rng  <- function(x, d = 2) paste0(fmt(quantile(x, 0.05), d), " to ", fmt(quantile(x, 0.95), d))
 
-# Categorical palette (fixed order). Nine regions exceed eight slots, so the two
-# negligible regions (GIS_GreenlandSea, EIS_MedSea) are folded into "Other".
-TODO: Check the colors with the latest colors from the interactive version?
-pal8 <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948")
+# Region colours: the paper figures' colours (Endres et al. 2026b, Fig. 2a),
+# lightness-tuned to pass colour-vision checks; identical to app/template.html.
+reg_col <- c(EIS_MedSea = "#1f77b4", EIS_BayOfBiscay = "#f1780b", EIS_NorwegianSea = "#2ca02c",
+             EIS_Arctic = "#d62728", LAU_Arctic = "#9467bd", GIS_GreenlandSea = "#9b4c3c",
+             LAU_LabradorSea = "#de72bd", LAU_StLawrence = "#a5a608", LAU_GulfOfMexico = "#00b3c3")
+# Stacking order (bottom to top) that keeps neighbouring colours distinguishable
+stack_order <- c("EIS_BayOfBiscay", "LAU_LabradorSea", "LAU_StLawrence", "LAU_GulfOfMexico",
+                 "EIS_Arctic", "EIS_MedSea", "EIS_NorwegianSea", "LAU_Arctic", "GIS_GreenlandSea")
 col_fresh <- "#2a78d6"; col_resal <- "#eb6834"; ink2 <- "grey35"
 theme_ms <- theme_bw(base_size = 9) +
   theme(panel.grid.minor = element_blank(), panel.grid.major = element_line(linewidth = 0.2, colour = "grey90"),
@@ -83,6 +87,12 @@ glas <- dat("sample.csv") |> filter(entity_id == entity$entity_id) |>
 dates <- dat("dating.csv") |> filter(entity_id == entity$entity_id) |> arrange(depth_dating)
 win <- range(glas$interp_age)
 steps_g <- diff(sort(glas$interp_age))
+
+# Transport weights from source region to proxy site (Endres et al. 2026b)
+wts <- dat("meltmodel_site_weights.csv")
+# Linear vs saturating conversion: for anomaly L (linear) and end-member em, the
+# mixing-fraction anomaly is L / (1 + L / em), so the linear value is larger by |L| / |em|
+max_sat <- max(abs(long$anom)) / abs(em)
 ```
 
 ```{r}
@@ -138,11 +148,25 @@ end-members rescale every anomaly by the same factor and change no ranking,
 correlation or event timing.
 
 The convolved anomaly at NISA (Endres et al., in prep., Fig. 5.13 C and E) is
-not in the repository. "Contribution at NISA" is therefore evaluated on the
-forcing side: the source-region anomaly each region would inject, before
-ocean transport, AMOC-mode dependence and moisture transport to the cave.
-TODO: insert the convolved anomaly at all 6 sites from the Meltmodel manuscript
-TODO: insert all sites from the meltmodel manuscript
+not in the repository, and neither are the impulse-response kernels.
+"Contribution at NISA" is therefore evaluated in two ways. On the *forcing
+side*, the regions' source anomalies are compared before any ocean transport.
+At the *proxy sites*, each source anomaly is weighted by the fraction of it
+that reaches the site, using the transport weights of Endres et al. (2026b).
+
+**Proxy sites and transport weights.** Endres et al. (2026b) evaluate ten
+proxy sites. Nine of them have the information needed here (@tbl-sites):
+six marine sediment cores, the NISA cave (La Vallina), Cave Without a Name
+and the NGRIP ice core. Llarga Cave has no moisture-uptake mask and is also
+absent from their Fig. 7. For each site, source region and AMOC mode (cold
+and zonal), the paper gives the fraction of the source-region δ¹⁸O anomaly
+that reaches the site after 500 yr of constant input. For land sites the
+ocean anomaly is weighted by the site's moisture-uptake area. These weights
+were taken from the paper's figure data
+(`data/meltmodel_site_weights.csv`; provenance in
+`data/meltmodel_site_weights.md`). They range from
+`r fmt(min(wts$weight), 4)` to `r fmt(max(wts$weight), 3)`, so a site sees
+at most about `r fmt(100 * max(wts$weight), 0)` % of a region's source anomaly.
 
 **Glas.** Entity `r entity$entity_id` (La Vallina cave, NISA) has
 `r nrow(glas)` δ¹⁸O samples between `r fmt(min(glas$depth_sample), 1)` and
@@ -174,6 +198,20 @@ averaged into the ICE-6G time steps. GLAC-1D is also summarised at its native
   variance of the total anomaly to the regions and sums to one. The SD of
   step-to-step changes measures abruptness.
 
+**Anomaly at the proxy sites.** The anomaly at a site is approximated as the
+weighted sum of the source anomalies, A~site~(t) = Σ~regions~ w~site,region~ ·
+A~region~(t), separately for the cold and the zonal AMOC mode. This is the
+equilibrium limit of the forward-model convolution. It applies the 500-yr
+response to every time step at once and ignores transit times of years to
+centuries. Slow changes are therefore represented about right, but short
+pulses are overstated and appear without delay. The source anomalies are
+those of the discharge files, which are linear in discharge and are what the
+forward-model draft convolves. Endres et al. (2026b) instead use a mixing
+fraction that saturates for large inputs, so for the largest pulse in these
+series the linear anomaly is up to `r fmt(100 * max_sat, 0)` % larger. The
+same importance and variability metrics as above are then computed for the
+contributions at NISA.
+
 ## Age uncertainty of Glas
 
 The published chronology is a single realisation. To propagate its
@@ -202,7 +240,20 @@ and to same-sign events.
    *high-pass* version isolates centennial variations: it is the residual
    after subtracting a Gaussian smoother of 750 yr width. Cross-correlations
    were computed for lags of ±2,000 yr against the total and the nine
-   regional anomalies of GLAC-1D. TODO: give me some simpler explanation about what you did here.
+   regional anomalies of GLAC-1D.
+
+   *In plain terms:* the question is whether Glas δ¹⁸O is low when the
+   modelled meltwater anomaly is large, and whether one follows the other
+   with a delay. Glas samples are unevenly spaced, so instead of first
+   interpolating Glas onto a regular grid, every pair of a Glas value and a
+   discharge value contributes to the correlation with a weight that falls off
+   the further apart the two are in time. This is done twice. The first pass
+   uses the complete records, which mostly compares the slow deglacial trend.
+   The second pass first subtracts a running average (a 750-yr Gaussian) from
+   both records, so that only the fast, centennial wiggles remain, where
+   abrupt events show up. Finally, one record is shifted against the other in
+   100-yr steps, up to 2,000 yr in each direction, to see whether the
+   agreement improves when Glas leads or lags the discharge.
 2. **Significance.** Two nulls were used. The first uses 300 AR(1) surrogates
    of Glas on its irregular times, with persistence estimated from the data
    (Schulz and Mudelsee, 2002). The second uses 300 phase-randomised
@@ -210,7 +261,7 @@ and to same-sign events.
    For the lead–lag search, a *family-wise* p value compares the largest
    |r| over all lags, and over all ten series, with the same maximum in the
    surrogates. This accounts for testing many lags and regions (Franke and
-   Donner, 2019). 
+   Donner, 2019).
 3. **Event matching.** Discharge pulses are 100-yr changes in the GLAC-1D total
    anomaly larger than k SD of all changes (k = 1, 1.5 and 2), split into
    freshening pulses and recoveries; consecutive steps are merged. A Glas
@@ -303,25 +354,95 @@ most important region in both GLAC-1D and ICE-6G, because both reconstructions
 route most of Meltwater Pulse 1A and the Holocene melt through Laurentide
 sectors.
 
-TODO: make a plot that visualizes this finding about the importance.
-TODO: add a spider-like plot that visualizes nicely the table 1 and 2 results, that makes them more understandable.
+@fig-importance shows these shares directly. Within the Glas interval,
+GLAC-1D spreads the anomaly over many regions with a European majority, while
+ICE-6G concentrates it in the Laurentide sectors. Over the full series both
+reconstructions become Laurentide-dominated. @fig-radar compares all five
+metrics of @tbl-rank and @tbl-rankfull region by region.
+
+```{r}
+#| label: fig-importance
+#| fig-cap: "Importance of the source regions: share of the summed source δ¹⁸O anomaly (500-yr grid, −35 ‰ end-member) within the Glas interval and over the full series. Regions are grouped by ice sheet (European, Greenland, Laurentide from left); labels give shares of at least 7 %, and the text at the right gives the European and Laurentide totals."
+#| fig-width: 7
+#| fig-height: 3.4
+ice_order <- c("EIS_MedSea", "EIS_BayOfBiscay", "EIS_NorwegianSea", "EIS_Arctic", "GIS_GreenlandSea",
+               "LAU_Arctic", "LAU_LabradorSea", "LAU_StLawrence", "LAU_GulfOfMexico")
+imp_df <- bind_rows(s_win |> mutate(period = "Glas interval"), s_full |> mutate(period = "Full series")) |>
+  mutate(bar = factor(paste(recon, period, sep = " · "),
+                      levels = rev(c("GLAC-1D · Glas interval", "ICE-6G · Glas interval",
+                                     "GLAC-1D · Full series", "ICE-6G · Full series"))),
+         region = factor(as.character(region), levels = rev(ice_order))) |>
+  arrange(bar, desc(region)) |> group_by(bar) |>
+  mutate(xmax = cumsum(share), xmin = xmax - share, xmid = (xmin + xmax) / 2) |> ungroup()
+imp_ice <- imp_df |> group_by(bar, ice) |> summarise(share = sum(share), .groups = "drop") |>
+  pivot_wider(names_from = ice, values_from = share) |>
+  mutate(lab = sprintf("Eur %s %% · Lau %s %%", fmt(100 * European, 0), fmt(100 * Laurentide, 0)))
+ggplot(imp_df) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = as.numeric(bar) - 0.38, ymax = as.numeric(bar) + 0.38, fill = region),
+            colour = "white", linewidth = 0.4) +
+  geom_text(data = imp_df |> filter(share >= 0.07), aes(xmid, as.numeric(bar), label = fmt(100 * share, 0)),
+            size = 2.6, colour = "white", fontface = "bold") +
+  geom_text(data = imp_ice, aes(1.02, as.numeric(bar), label = lab), hjust = 0, size = 2.6, colour = "grey25") +
+  scale_y_continuous(breaks = seq_along(levels(imp_df$bar)), labels = levels(imp_df$bar), expand = expansion(add = 0.3)) +
+  scale_x_continuous(labels = function(x) paste0(100 * x, " %"), breaks = seq(0, 1, 0.25), expand = expansion(mult = c(0, 0))) +
+  coord_cartesian(xlim = c(0, 1.33), clip = "off") +
+  scale_fill_manual(values = reg_col, breaks = ice_order, name = NULL) +
+  labs(x = "Share of summed source anomaly", y = NULL) +
+  theme_ms + theme(legend.position = "bottom", panel.grid.major.y = element_blank(),
+                   plot.margin = margin(5, 10, 5, 5)) +
+  guides(fill = guide_legend(nrow = 3))
+```
+
+```{r}
+#| label: fig-radar
+#| fig-cap: "Region profiles for the five metrics of Tables 1 and 2 (500-yr grid). Each spoke is scaled to the largest value of that metric over all regions, both reconstructions and both periods, so the outer ring is the maximum. Solid lines: Glas interval; dashed: full series. Negative variance shares are drawn at zero."
+#| fig-width: 7
+#| fig-height: 7
+metrics <- c(share = "Share", dom = "Dominant", sd = "SD", vshare = "Var. share", sd_diff = "SD Δ")
+rad <- bind_rows(s_win |> mutate(period = "Glas interval"), s_full |> mutate(period = "Full series")) |>
+  select(recon, period, region, all_of(names(metrics))) |>
+  pivot_longer(all_of(names(metrics)), names_to = "metric", values_to = "value") |>
+  mutate(value = pmax(value, 0)) |>
+  group_by(metric) |> mutate(r = value / max(value)) |> ungroup() |>
+  mutate(k = match(metric, names(metrics)), ang = pi / 2 - 2 * pi * (k - 1) / length(metrics),
+         x = r * cos(ang), y = r * sin(ang),
+         region = factor(as.character(region), levels = as.character(regions$region)),
+         period = factor(period, levels = c("Glas interval", "Full series"))) |>
+  arrange(recon, period, region, k)
+rad_closed <- rad |> group_by(recon, period, region) |> group_modify(~ bind_rows(.x, .x[1, ])) |> ungroup()
+spokes <- tibble(k = seq_along(metrics), ang = pi / 2 - 2 * pi * (k - 1) / length(metrics),
+                 x = cos(ang), y = sin(ang), lab = unname(metrics),
+                 lx = 1.28 * cos(ang), ly = 1.2 * sin(ang))
+rings <- expand_grid(r = c(0.5, 1), t = seq(0, 2 * pi, length.out = 73)) |> mutate(x = r * cos(t), y = r * sin(t))
+rec_col <- c("GLAC-1D" = "#184f95", "ICE-6G" = "#c26a00")
+ggplot() +
+  geom_path(data = rings, aes(x, y, group = r), colour = "grey85", linewidth = 0.3) +
+  geom_segment(data = spokes, aes(0, 0, xend = x, yend = y), colour = "grey85", linewidth = 0.3) +
+  geom_text(data = spokes, aes(lx, ly, label = lab), size = 2.3, colour = "grey35") +
+  geom_path(data = rad_closed, aes(x, y, colour = recon, linetype = period, group = interaction(recon, period)), linewidth = 0.6) +
+  facet_wrap(~region, ncol = 3) +
+  scale_colour_manual(values = rec_col, name = NULL) +
+  scale_linetype_manual(values = c("Glas interval" = "solid", "Full series" = "22"), name = NULL) +
+  coord_equal(xlim = c(-1.45, 1.45), ylim = c(-1.2, 1.3)) +
+  theme_void(base_size = 9) +
+  theme(strip.text = element_text(face = "bold", size = 8.5, margin = margin(b = 2)), legend.position = "bottom",
+        panel.spacing = unit(4, "pt"))
+```
 
 ```{r}
 #| label: fig-stack
-#| fig-cap: "Source-region δ¹⁸O anomalies (−35 ‰ end-member) at native resolution, stacked so the lower envelope is the summed anomaly. GIS_GreenlandSea and EIS_MedSea are combined as Other. Grey shading marks the Glas interval."
+#| fig-cap: "Source-region δ¹⁸O anomalies (−35 ‰ end-member) at native resolution, stacked so the lower envelope is the summed anomaly. Colours follow the region colours of Endres et al. (2026b). Grey shading marks the Glas interval."
 #| fig-width: 7
 #| fig-height: 5
-lv <- c(setdiff(as.character(regions$region), c("GIS_GreenlandSea", "EIS_MedSea")), "Other")
-stk <- long |> mutate(grp = ifelse(region %in% c("GIS_GreenlandSea", "EIS_MedSea"), "Other", as.character(region))) |>
-  group_by(recon, age, grp) |> summarise(anom = sum(anom), .groups = "drop") |>
-  mutate(grp = factor(grp, levels = lv))
+# geom_area stacks the first factor level on top, so reverse the bottom-to-top order
+stk <- long |> mutate(grp = factor(as.character(region), levels = rev(stack_order)))
 ggplot(stk, aes(age / 1000, anom, fill = grp)) +
   annotate("rect", xmin = win[1] / 1000, xmax = win[2] / 1000, ymin = -Inf, ymax = Inf, fill = "grey92") +
-  geom_area(position = "stack", colour = "white", linewidth = 0.15) +
+  geom_area(position = "stack", colour = NA) +
   facet_wrap(~recon, ncol = 1, scales = "free_y") +
   scale_x_reverse(limits = c(28, -2), breaks = seq(28, 0, -4)) +
-  scale_fill_manual(values = setNames(c(pal8, "grey70")[seq_along(lv)], lv), name = NULL) +
-  labs(x = "Age (ka BP)", y = "Source δ¹⁸O anomaly (‰)") +
+  scale_fill_manual(values = reg_col, breaks = as.character(regions$region), name = NULL) +
+  labs(x = "Age (ka BP)", y = expression("Source" ~ delta^18*O ~ "anomaly (‰)")) +
   theme_ms + theme(legend.position = "bottom") + guides(fill = guide_legend(nrow = 3))
 ```
 
@@ -340,6 +461,112 @@ knitr::kable(rank_tab(s_win))
 #| label: tbl-rankfull
 #| tbl-cap: "As the previous table, but over the full length of each series."
 knitr::kable(rank_tab(s_full))
+```
+
+## Transport-weighted anomaly at the proxy sites
+
+```{r}
+#| label: sites
+site_ts <- long |> select(recon, age, region, anom) |> mutate(region = as.character(region)) |>
+  inner_join(wts |> select(site, amoc_mode, region, weight), by = "region", relationship = "many-to-many") |>
+  group_by(recon, amoc_mode, site, age) |> summarise(anom = sum(weight * anom), .groups = "drop")
+site_info <- wts |> distinct(site, type, lat, lon) |> arrange(desc(lat))
+site_sum <- site_ts |> filter(age >= win[1], age <= win[2]) |>
+  group_by(recon, amoc_mode, site) |> summarise(mean = mean(anom), min = min(anom), .groups = "drop")
+nisa_c <- long |> filter(age >= win[1], age <= win[2]) |> select(recon, age, region, anom) |>
+  mutate(region = as.character(region)) |>
+  inner_join(wts |> filter(site == "La Vallina (NISA)") |> select(amoc_mode, region, weight),
+             by = "region", relationship = "many-to-many") |>
+  mutate(c = weight * anom) |>
+  group_by(recon, amoc_mode, region) |> summarise(mean = mean(c), sd = sd(c), .groups = "drop") |>
+  group_by(recon, amoc_mode) |> mutate(share = mean / sum(mean)) |> ungroup()
+nisa_top <- nisa_c |> group_by(recon, amoc_mode) |> slice_max(share, n = 1) |> ungroup()
+nisa_var <- nisa_c |> group_by(recon, amoc_mode) |> slice_max(sd, n = 1) |> ungroup()
+nt <- function(r, m, what = nisa_top) what |> filter(recon == r, amoc_mode == m)
+ss <- function(r, m, s, v = "mean") site_sum[[v]][site_sum$recon == r & site_sum$amoc_mode == m & site_sum$site == s]
+zc <- site_sum |> select(recon, amoc_mode, site, mean) |> pivot_wider(names_from = amoc_mode, values_from = mean) |>
+  mutate(ratio = zonal / cold)
+var_same <- nisa_var |> group_by(recon) |> summarise(same = n_distinct(region) == 1) |> pull(same) |> all()
+```
+
+@fig-sites shows the transport-weighted anomaly at all nine sites. The
+anomaly is largest in the Nordic Seas and the subpolar North Atlantic and
+smallest at the continental sites. PS2644-5 averages
+`r fmt(ss("GLAC-1D", "cold", "PS2644-5"))` ‰ over the Glas interval with
+GLAC-1D in the cold mode, compared with
+`r fmt(ss("GLAC-1D", "cold", "La Vallina (NISA)"))` ‰ at NISA. In the zonal
+mode, with a strong AMOC, the sites receive between
+`r fmt(100 * min(zc$ratio), 0)` and `r fmt(100 * max(zc$ratio), 0)` % of the
+cold-mode anomaly (median `r fmt(100 * median(zc$ratio), 0)` %), because more
+of the meltwater is exported from the surface North Atlantic.
+@tbl-sites lists the sites and their Glas-interval means.
+
+At NISA, weighting by transport changes the ranking of the source regions
+(@fig-nisa). In GLAC-1D, `r nt("GLAC-1D", "cold")$region` becomes the most
+important contributor, with `r fmt(100 * nt("GLAC-1D", "cold")$share, 0)` % of
+the anomaly in the cold mode and `r fmt(100 * nt("GLAC-1D", "zonal")$share, 0)` %
+in the zonal mode. The Bay of Biscay transports efficiently to the cave's
+moisture source, whereas the two Arctic sectors, which rank near the top on
+the source side, reach NISA only weakly. In ICE-6G, `r nt("ICE-6G", "cold")$region`
+stays first, with `r fmt(100 * nt("ICE-6G", "cold")$share, 0)` % (cold) and
+`r fmt(100 * nt("ICE-6G", "zonal")$share, 0)` % (zonal). The most variable
+contribution at NISA is `r nt("GLAC-1D", "cold", nisa_var)$region` in GLAC-1D
+and `r nt("ICE-6G", "cold", nisa_var)$region` in ICE-6G
+`r ifelse(var_same, "in both AMOC modes", "in the cold AMOC mode")`.
+
+```{r}
+#| label: fig-sites
+#| fig-cap: "Transport-weighted δ¹⁸O anomaly at the nine proxy sites of Endres et al. (2026b), ordered from north to south: the sum over regions of the source anomaly (−35 ‰ end-member) times the site's transport weight. Solid lines: cold (weak) AMOC mode; dashed: zonal (strong) mode. Grey shading marks the Glas interval. This is an equilibrium approximation that ignores transit times, so short pulses are overstated."
+#| fig-width: 7
+#| fig-height: 6.2
+rec_col <- c("GLAC-1D" = "#184f95", "ICE-6G" = "#c26a00")
+ggplot(site_ts |> mutate(site = factor(site, levels = site_info$site)),
+       aes(age / 1000, anom, colour = recon, linetype = amoc_mode)) +
+  annotate("rect", xmin = win[1] / 1000, xmax = win[2] / 1000, ymin = -Inf, ymax = Inf, fill = "grey92") +
+  geom_hline(yintercept = 0, linewidth = 0.25, colour = "grey60") +
+  geom_line(linewidth = 0.35) +
+  facet_wrap(~site, ncol = 3) +
+  scale_x_reverse(limits = c(28, 0), breaks = seq(28, 0, -7)) +
+  scale_colour_manual(values = rec_col, name = NULL) +
+  scale_linetype_manual(values = c(cold = "solid", zonal = "22"), labels = c(cold = "Cold AMOC mode", zonal = "Zonal AMOC mode"), name = NULL) +
+  labs(x = "Age (ka BP)", y = expression("Site" ~ delta^18*O ~ "anomaly (‰)")) +
+  theme_ms + theme(legend.position = "bottom")
+```
+
+```{r}
+#| label: tbl-sites
+#| tbl-cap: "Proxy sites of Endres et al. (2026b) used here, from north to south, with the mean transport-weighted δ¹⁸O anomaly over the Glas interval (‰, −35 ‰ end-member) for each reconstruction and AMOC mode."
+site_info |>
+  left_join(site_sum |> mutate(col = paste(recon, amoc_mode)) |> select(site, col, mean) |>
+              pivot_wider(names_from = col, values_from = mean), by = "site") |>
+  transmute(Site = site, Type = type, `Lat (°N)` = fmt(lat, 1), `Lon (°E)` = fmt(lon, 1),
+            `GLAC-1D cold` = fmt(`GLAC-1D cold`), `GLAC-1D zonal` = fmt(`GLAC-1D zonal`),
+            `ICE-6G cold` = fmt(`ICE-6G cold`), `ICE-6G zonal` = fmt(`ICE-6G zonal`)) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: fig-nisa
+#| fig-cap: "Importance of the source regions at NISA after weighting by transport: share of the transport-weighted anomaly within the Glas interval, for each reconstruction and AMOC mode. Compare with the source-side shares in @fig-importance; labels give shares of at least 7 %."
+#| fig-width: 7
+#| fig-height: 3
+nb <- nisa_c |>
+  mutate(bar = factor(paste(recon, amoc_mode, sep = " · "),
+                      levels = rev(c("GLAC-1D · cold", "GLAC-1D · zonal", "ICE-6G · cold", "ICE-6G · zonal"))),
+         region = factor(region, levels = rev(ice_order))) |>
+  arrange(bar, desc(region)) |> group_by(bar) |>
+  mutate(xmax = cumsum(share), xmin = xmax - share, xmid = (xmin + xmax) / 2) |> ungroup()
+ggplot(nb) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = as.numeric(bar) - 0.38, ymax = as.numeric(bar) + 0.38, fill = region),
+            colour = "white", linewidth = 0.4) +
+  geom_text(data = nb |> filter(share >= 0.07), aes(xmid, as.numeric(bar), label = fmt(100 * share, 0)),
+            size = 2.6, colour = "white", fontface = "bold") +
+  scale_y_continuous(breaks = seq_along(levels(nb$bar)), labels = paste(levels(nb$bar), "mode"), expand = expansion(add = 0.3)) +
+  scale_x_continuous(labels = function(x) paste0(100 * x, " %"), breaks = seq(0, 1, 0.25), expand = expansion(mult = c(0, 0.01))) +
+  scale_fill_manual(values = reg_col, breaks = ice_order, name = NULL) +
+  labs(x = "Share of the transport-weighted anomaly at NISA", y = NULL) +
+  theme_ms + theme(legend.position = "bottom", panel.grid.major.y = element_blank()) +
+  guides(fill = guide_legend(nrow = 3))
 ```
 
 ## The Glas age-model ensemble
@@ -652,7 +879,45 @@ events is itself uncertain:
   Pulse 1A. The event therefore aligns better with discharge of the opposite
   sign.
 
-TODO: make a figure where you show on the glas time series which shifts match well.
+@fig-matches shows the six events on the Glas record, together with the
+nearest same-sign GLAC-1D pulse and how often the match holds across the age
+ensemble.
+
+```{r}
+#| label: fig-matches
+#| fig-cap: "Which abrupt Glas shifts match a GLAC-1D discharge pulse. Grey points: Glas δ¹⁸O samples; black line: 100-yr means. Bands: the six published events, spanning their 5–95 % ensemble age range (blue freshening, orange re-salinisation); solid bands are robust matches (same-sign pulse within ±300 yr in ≥ 80 % of age models), pale dashed bands are uncertain. Triangles at the bottom: GLAC-1D pulses above 1 SD (down: freshening, up: recovery). The line from each event to its nearest same-sign pulse is labelled with the offset on the published chronology and the match probability P."
+#| fig-width: 7
+#| fig-height: 4.2
+yr <- range(glas$d18O_measurement)
+y_pulse <- yr[1] - 0.75; y_link0 <- yr[1] - 0.25; y_lab0 <- yr[2] + 0.2
+mdf <- ev_pub |> mutate(robust = pm >= 0.8, col = ifelse(sign < 0, col_fresh, col_resal),
+                        lab = sprintf("%s\nP = %s", event, fmt(pm, 2)),
+                        olab = sprintf("%+d yr", round(offset)),
+                        lvl = (seq_len(n()) - 1) %% 2,            # alternate two label levels
+                        y_lab = y_lab0 + 0.42 * lvl, y_link = y_link0 - 0.25 * lvl)
+pl_win <- pulses |> filter(age >= win[1] - 300, age <= win[2] + 300)
+ggplot() +
+  geom_rect(data = mdf, aes(xmin = ens_lo / 1000, xmax = ens_hi / 1000, ymin = -Inf, ymax = Inf, fill = col,
+                            alpha = robust, linetype = robust), colour = NA) +
+  geom_rect(data = mdf |> filter(!robust), aes(xmin = ens_lo / 1000, xmax = ens_hi / 1000, ymin = y_link0 + 0.1, ymax = yr[2] + 0.1,
+                                               colour = col), fill = NA, linetype = "22", linewidth = 0.35) +
+  geom_point(data = glas, aes(interp_age / 1000, d18O_measurement), size = 0.35, colour = "grey65") +
+  geom_line(data = gb, aes(age / 1000, d), linewidth = 0.45) +
+  geom_point(data = pl_win, aes(age / 1000, y_pulse, shape = factor(sign), colour = ifelse(sign < 0, col_fresh, col_resal)),
+             size = 2, fill = NA) +
+  geom_segment(data = mdf, aes(x = age_pub / 1000, xend = pulse / 1000, y = y_link, yend = y_link, colour = col),
+               linewidth = 0.6, arrow = arrow(length = unit(3, "pt"), type = "closed")) +
+  geom_text(data = mdf, aes((age_pub + pulse) / 2000, y_link + 0.13, label = olab), size = 2.3, colour = "grey25") +
+  geom_text(data = mdf, aes(age_pub / 1000, y_lab, label = lab, fontface = ifelse(robust, "bold", "plain")),
+            size = 2.4, lineheight = 0.9, vjust = 0) +
+  scale_fill_identity() + scale_colour_identity() +
+  scale_alpha_manual(values = c(`TRUE` = 0.35, `FALSE` = 0.1), guide = "none") +
+  scale_linetype_manual(values = c(`TRUE` = "solid", `FALSE` = "22"), guide = "none") +
+  scale_shape_manual(values = c("-1" = 25, "1" = 24), guide = "none") +
+  scale_x_reverse(breaks = seq(12, 24, 1), limits = c(win[2] / 1000 + 0.35, win[1] / 1000 - 0.3)) +
+  scale_y_continuous(limits = c(y_pulse - 0.15, y_lab0 + 0.42 + 0.5), breaks = seq(-5, -1, 0.5)) +
+  labs(x = "Age (ka BP)", y = expression("Glas" ~ delta^18*O ~ "(‰)")) + theme_ms
+```
 
 @tbl-sens shows that significance depends on the tolerance. At ±200–300 yr
 no combination reaches p < 0.05. At ±500 yr the median count is significant
@@ -707,7 +972,7 @@ xs <- scale_x_reverse(limits = xl, breaks = seq(12, 24, 2))
 p1 <- ggplot() + evr + fl +
   geom_point(data = glas, aes(interp_age / 1000, d18O_measurement), size = 0.4, colour = "grey60") +
   geom_line(data = gb, aes(age / 1000, d), linewidth = 0.4) + xs +
-  labs(x = NULL, y = "Glas δ¹⁸O (‰)") + theme_ms
+  labs(x = NULL, y = expression("Glas" ~ delta^18*O ~ "(‰)")) + theme_ms
 tg_w <- tot |> filter(recon == "GLAC-1D", age >= win[1] - 400, age <= win[2] + 400)
 p2 <- ggplot() + evr + fl +
   geom_line(data = tg_w, aes(age / 1000, tot), linewidth = 0.4) +
@@ -787,7 +1052,7 @@ ggplot(sea_df, aes(t)) +
   geom_ribbon(aes(ymin = lo, ymax = hi), fill = "#86b6ef", alpha = 0.6) +
   geom_hline(yintercept = 0, linewidth = 0.3) + geom_vline(xintercept = 0, linewidth = 0.3, linetype = "dashed") +
   geom_line(aes(y = med), colour = "#184f95", linewidth = 0.6) +
-  facet_wrap(~type) + labs(x = "Time after pulse (yr)", y = "Glas Δδ¹⁸O (‰)") + theme_ms
+  facet_wrap(~type) + labs(x = "Time after pulse (yr)", y = expression("Glas" ~ Delta*delta^18*O ~ "(‰)")) + theme_ms
 ```
 
 ```{r}
@@ -844,13 +1109,22 @@ summed source anomaly), with European sectors supplying
 `r imp(s_win, "ICE-6G")$region` (`r fmt(100 * imp(s_win, "ICE-6G")$share, 0)` %),
 with Laurentide sectors supplying `r gs("ICE-6G", "Laurentide")` %. Over the
 full series, both reconstructions put `r imp(s_full, "GLAC-1D")$region` first.
+Weighted by transport to NISA, the answer shifts toward regions that reach the
+cave efficiently. In GLAC-1D, `r nt("GLAC-1D", "cold")$region` becomes the
+most important region at NISA (`r fmt(100 * min(nisa_top$share[nisa_top$recon == "GLAC-1D"]), 0)`–`r fmt(100 * max(nisa_top$share[nisa_top$recon == "GLAC-1D"]), 0)` %
+of the site anomaly in the two AMOC modes). In ICE-6G it remains
+`r nt("ICE-6G", "cold")$region`
+(`r fmt(100 * min(nisa_top$share[nisa_top$recon == "ICE-6G"]), 0)`–`r fmt(100 * max(nisa_top$share[nisa_top$recon == "ICE-6G"]), 0)` %).
 
 **Most variable source region.** In GLAC-1D it is
 `r var_(s_win, "GLAC-1D")$region`, which has the largest SD and
 `r fmt(100 * vsh(s_win, "GLAC-1D")$vshare, 0)` % of the variance of the total
 anomaly. In ICE-6G, `r var_(s_win, "ICE-6G")$region` and
 `r vsh(s_win, "ICE-6G")$region` share this role. In both reconstructions the
-variability comes from a few short pulses.
+variability comes from a few short pulses. At NISA, after transport
+weighting, the most variable contribution is
+`r nt("GLAC-1D", "cold", nisa_var)$region` in GLAC-1D and
+`r nt("ICE-6G", "cold", nisa_var)$region` in ICE-6G.
 
 **Alignment with Glas.** Glas and the discharge share millennial structure
 and several individual events. There is no systematic centennial response.
@@ -888,14 +1162,14 @@ alignment at the ~500-yr scale can.
 
 # Caveats
 
-- **Forcing, not NISA response.** The anomalies are source-region forcing.
-  Transport to NISA is efficient from the Bay of Biscay and Norwegian Sea and
-  weak from the Arctic sectors, and it depends on the AMOC mode (Endres et
-  al., 2026b; in prep.). Weighting by transport would shift importance toward
-  the European sectors. The draft reproduces the 14.7 ka case as AMOC
-  recovery cancelling the Meltwater Pulse 1A anomaly at NISA. The most direct
-  test would compare Glas with the convolved NISA series, which is not in the
-  repository.
+- **Equilibrium transport, one AMOC mode at a time.** The alignment tests
+  use the source-region forcing. The site anomalies use equilibrium
+  transport weights (Endres et al., 2026b), which ignore transit times and
+  hold the AMOC mode fixed. The forward-model draft (in prep.) switches modes
+  through the deglaciation and reproduces the 14.7 ka case as AMOC recovery
+  cancelling the Meltwater Pulse 1A anomaly at NISA, which neither approach
+  here can capture. The most direct test would compare Glas with the
+  convolved NISA series, which is not in the repository.
 - **Discharge chronology.** The ice-sheet reconstructions have their own age
   uncertainty, which is only bracketed here by the offset scan.
 - **Glas δ¹⁸O is not only seawater.** It also records temperature, moisture
