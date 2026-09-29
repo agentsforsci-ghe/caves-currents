@@ -27,6 +27,7 @@ rng  <- function(x, d = 2) paste0(fmt(quantile(x, 0.05), d), " to ", fmt(quantil
 
 # Categorical palette (fixed order). Nine regions exceed eight slots, so the two
 # negligible regions (GIS_GreenlandSea, EIS_MedSea) are folded into "Other".
+TODO: Check the colors with the latest colors from the interactive version?
 pal8 <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948")
 col_fresh <- "#2a78d6"; col_resal <- "#eb6834"; ink2 <- "grey35"
 theme_ms <- theme_bw(base_size = 9) +
@@ -140,6 +141,8 @@ The convolved anomaly at NISA (Endres et al., in prep., Fig. 5.13 C and E) is
 not in the repository. "Contribution at NISA" is therefore evaluated on the
 forcing side: the source-region anomaly each region would inject, before
 ocean transport, AMOC-mode dependence and moisture transport to the cave.
+TODO: insert the convolved anomaly at all 6 sites from the Meltmodel manuscript
+TODO: insert all sites from the meltmodel manuscript
 
 **Glas.** Entity `r entity$entity_id` (La Vallina cave, NISA) has
 `r nrow(glas)` δ¹⁸O samples between `r fmt(min(glas$depth_sample), 1)` and
@@ -199,7 +202,7 @@ and to same-sign events.
    *high-pass* version isolates centennial variations: it is the residual
    after subtracting a Gaussian smoother of 750 yr width. Cross-correlations
    were computed for lags of ±2,000 yr against the total and the nine
-   regional anomalies of GLAC-1D.
+   regional anomalies of GLAC-1D. TODO: give me some simpler explanation about what you did here.
 2. **Significance.** Two nulls were used. The first uses 300 AR(1) surrogates
    of Glas on its irregular times, with persistence estimated from the data
    (Schulz and Mudelsee, 2002). The second uses 300 phase-randomised
@@ -207,7 +210,7 @@ and to same-sign events.
    For the lead–lag search, a *family-wise* p value compares the largest
    |r| over all lags, and over all ten series, with the same maximum in the
    surrogates. This accounts for testing many lags and regions (Franke and
-   Donner, 2019).
+   Donner, 2019). 
 3. **Event matching.** Discharge pulses are 100-yr changes in the GLAC-1D total
    anomaly larger than k SD of all changes (k = 1, 1.5 and 2), split into
    freshening pulses and recoveries; consecutive steps are merged. A Glas
@@ -299,6 +302,9 @@ Over the full series (@tbl-rankfull), `r imp(s_full, "GLAC-1D")$region` is the
 most important region in both GLAC-1D and ICE-6G, because both reconstructions
 route most of Meltwater Pulse 1A and the Holocene melt through Laurentide
 sectors.
+
+TODO: make a plot that visualizes this finding about the importance.
+TODO: add a spider-like plot that visualizes nicely the table 1 and 2 results, that makes them more understandable.
 
 ```{r}
 #| label: fig-stack
@@ -645,6 +651,8 @@ events is itself uncertain:
   away, at `r ka(nearest(ev_pub$age_pub[6], -1, pulses), 2)` ka, during Meltwater
   Pulse 1A. The event therefore aligns better with discharge of the opposite
   sign.
+
+TODO: make a figure where you show on the glas time series which shifts match well.
 
 @tbl-sens shows that significance depends on the tolerance. At ±200–300 yr
 no combination reaches p < 0.05. At ±500 yr the median count is significant
