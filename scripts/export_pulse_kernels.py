@@ -140,15 +140,20 @@ def dim_like(da, *names):
     return None
 
 
-def surface(da):
-    """Surface level and lat >= LAT_MIN, as (time, latitude, longitude) values."""
+def surface(da, n_years):
+    """First `n_years` of the surface level at lat >= LAT_MIN, as values.
+
+    Time, depth and latitude are cut by index before anything is read, so
+    only the needed part of each file comes over NFS.
+    """
     tdim = dim_like(da, "t")
     zdim = dim_like(da, "depth", "lev", "z")
     ydim = dim_like(da, "lat")
     xdim = dim_like(da, "lon")
+    da = da.isel({tdim: slice(0, n_years)})
     if zdim is not None:
         da = da.isel({zdim: 0}, drop=True)
-    da = da.where(da[ydim] >= LAT_MIN, drop=True)
+    da = da.isel({ydim: np.asarray(da[ydim].values >= LAT_MIN)})
     da = da.rename({ydim: "latitude", xdim: "longitude"}).transpose(tdim, "latitude", "longitude")
     return da.values.astype("float32"), da["latitude"].values, da["longitude"].values
 
@@ -161,23 +166,34 @@ def decadal_means(vals):
     return vals[: n_dec * DECADE].reshape(n_dec, DECADE, *vals.shape[1:]).mean(axis=1)
 
 
-def year_of(t):
-    return getattr(t, "year", None)
+def time_years(exp):
+    """Model years of an experiment, read from the time variable of dye00 only.
+
+    Uses netCDF4 directly: no data and no other coordinates are read, which
+    keeps the check fast on NFS.
+    """
+    import netCDF4
+    f = BASE_DIR / FILE_PATTERN.format(exp=exp, dye=DYES[0])
+    with netCDF4.Dataset(f) as nc:
+        grid = [v for v in nc.variables.values() if v.ndim >= 3][0]
+        tname = [d for d in grid.dimensions if d.lower().startswith("t")][0]
+        tv = nc.variables[tname]
+        dates = netCDF4.num2date(tv[:], tv.units, getattr(tv, "calendar", "standard"))
+    return [d.year for d in dates]
 
 
-def check_continuity(mode, parent_ds, pulse_ds):
+def check_continuity(mode, exps):
     """The pulse run should start the year after the prepended parent years."""
-    tp = parent_ds[dim_like(parent_ds[DYES[0]], "t")].values
-    tq = pulse_ds[dim_like(pulse_ds[DYES[0]], "t")].values
-    first, last, nxt = year_of(tp[0]), year_of(tp[PULSE_YEARS - 1]), year_of(tq[0])
+    tp, tq = time_years(exps["parent"]), time_years(exps["pulse"])
+    first, last, nxt = tp[0], tp[PULSE_YEARS - 1], tq[0]
     n_total = PULSE_YEARS + len(tq)
-    msg = (f"  {mode:6s} pulse years {first}-{last} from parent, pulse run starts {nxt}, "
-           f"{n_total} yr in total")
-    if None not in (last, nxt) and nxt != last + 1:
-        msg += f"  <-- WARNING: expected pulse run to start in {last + 1}"
+    msg = (f"  {mode:6s} pulse years {first}-{last} from {exps['parent']}, "
+           f"{exps['pulse']} starts {nxt}, {n_total} yr in total")
+    if nxt != last + 1:
+        msg += f"  <-- WARNING: expected {exps['pulse']} to start in {last + 1}"
     if n_total < N_YEARS:
         msg += f"  <-- WARNING: fewer than N_YEARS={N_YEARS}"
-    print(msg)
+    print(msg, flush=True)
 
 
 def export_fields(dry_run=False):
@@ -190,34 +206,33 @@ def export_fields(dry_run=False):
                 print(f"         {f}")
             for f in extra_files(exps[role]):
                 print(f"         (not used) {f.name}")
-    print("Time axes:")
-    opened = {}
+    print("Time axes:", flush=True)
+    ok = True
     for mode, exps in PULSE_EXPERIMENTS.items():
         try:
-            opened[mode] = (open_experiment(exps["parent"]), open_experiment(exps["pulse"]))
-        except (FileNotFoundError, OSError) as err:
-            print(f"  {mode:6s} cannot open: {err}")
-            continue
-        check_continuity(mode, *opened[mode])
+            check_continuity(mode, exps)
+        except (OSError, IndexError, KeyError) as err:
+            print(f"  {mode:6s} cannot read time axis: {err}")
+            ok = False
     if dry_run:
         return None
-    missing = [m for m in modes if m not in opened]
-    if missing:
-        sys.exit(f"Cannot export, experiments missing for: {', '.join(missing)}")
+    if not ok:
+        sys.exit("Cannot export: fix the experiments above first.")
 
     kernel = None
     for m, mode in enumerate(modes):
-        parent_ds, pulse_ds = opened[mode]
+        parent_ds = open_experiment(PULSE_EXPERIMENTS[mode]["parent"])
+        pulse_ds = open_experiment(PULSE_EXPERIMENTS[mode]["pulse"])
         for d, dye in enumerate(DYES):
-            head, lat, lon = surface(parent_ds[dye])
-            tail, lat2, lon2 = surface(pulse_ds[dye])
+            head, lat, lon = surface(parent_ds[dye], PULSE_YEARS)
+            tail, lat2, lon2 = surface(pulse_ds[dye], N_YEARS - PULSE_YEARS)
             if not (np.array_equal(lat, lat2) and np.array_equal(lon, lon2)):
                 raise ValueError(f"{mode} {dye}: parent and pulse grids differ")
-            vals = decadal_means(np.concatenate([head[:PULSE_YEARS], tail], axis=0))
+            vals = decadal_means(np.concatenate([head, tail], axis=0))
             if kernel is None:
                 kernel = np.full((len(modes), len(DYES), *vals.shape), np.nan, dtype="float32")
             kernel[m, d] = vals
-            print(f"  {mode} {dye}: max {np.nanmax(vals):.4g}")
+            print(f"  {mode} {dye}: max {np.nanmax(vals):.4g}", flush=True)
         parent_ds.close()
         pulse_ds.close()
 
