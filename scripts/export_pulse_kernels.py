@@ -11,7 +11,9 @@ What it writes (to OUTDIR)
 pulse_kernels_surface.nc
     kernel(mode, dye, lag, latitude, longitude), float32, zlib-compressed.
     Surface level only, latitudes >= LAT_MIN, decadal means of the first
-    N_YEARS years after the pulse starts (lag 0 = first decade).
+    N_YEARS years after the pulse starts (lag 0 = first decade). The pulse
+    years are the first PULSE_YEARS years of the parent constant-input run,
+    followed by the pulse run (as in Create_impulsets.ipynb).
 notebook_point_kernels.nc   (only if the notebook pickles are found)
     point(site, mode, dye, lag): the NA / NISA / PS pulse responses of
     regions.pkl, and const(site, mode, dye, lag): the 500-yr constant-input
@@ -19,9 +21,10 @@ notebook_point_kernels.nc   (only if the notebook pickles are found)
 
 Usage
 -----
-1. Fill in PULSE_EXPERIMENTS (and check the other settings) below.
-2. python export_pulse_kernels.py            # or: --dry-run to list files only
-3. Copy the printed tar file home and unpack it into data/kernels/.
+1. Check PULSE_EXPERIMENTS below (the merid parent needs confirming).
+2. python export_pulse_kernels.py --dry-run  # files + time-axis check only
+3. python export_pulse_kernels.py
+4. Copy the printed tar file home and unpack it into data/kernels/.
 
 Author: Laura Endres
 """
@@ -31,21 +34,33 @@ import datetime
 import os
 import pickle
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
 import xarray as xr
+
+# Model years (5000s) are outside the numpy datetime range; cftime is fine.
+warnings.filterwarnings("ignore", category=xr.SerializationWarning)
 
 
 # =============================================================================
 # Configuration: edit here
 # =============================================================================
 
-# Pulse (impulse-response) experiment ID per AMOC mode.
+# Pulse (impulse-response) experiments per AMOC mode, as in the notebook
+# Create_impulsets.ipynb. Each pulse run starts AFTER its 10-yr dye pulse;
+# the pulse years themselves are the first PULSE_YEARS years of the parent
+# constant-input run, and are prepended (notebook cell 2).
+#   cold : xpran after xpraj 5681-5690
+#   zonal: xprao after xprak 5101-5110
+#   merid: xpujc after xpral  <- TO CONFIRM. The notebook takes these years
+#          from 'xpram', which it never loads, so the merid pulse was skipped
+#          there. xpral is the merid constant run (EXPERIMENTS.py, 17.8k).
 PULSE_EXPERIMENTS = {
-    "cold": "TODO",
-    "zonal": "TODO",
-    "merid": "TODO",
+    "cold": {"pulse": "xpran", "parent": "xpraj"},
+    "zonal": {"pulse": "xprao", "parent": "xprak"},
+    "merid": {"pulse": "xpujc", "parent": "xpral"},
 }
 
 # Same layout as mymodules/dyefield_computation.py in the meltmodel repo:
@@ -53,12 +68,10 @@ PULSE_EXPERIMENTS = {
 BASE_DIR = Path("/nfs/annie/earpal/database/experiments")
 FILE_PATTERN = "{exp}/time_series/{exp}.dye0?.annual.nc"
 
-# Pulse design, written into the file attributes (please fill in).
-PULSE_YEARS = None          # length of the dye pulse in years, e.g. 10
-PULSE_AMPLITUDE = None      # dye input during the pulse (units as in the model)
+# Pulse design: 10 yr of the constant-input run's dye flux, then zero.
+PULSE_YEARS = 10
+PULSE_AMPLITUDE = "same dye flux as the parent constant-input run"
 
-# Index (in years from the first file time step) at which the pulse starts.
-PULSE_START_INDEX = 0
 N_YEARS = 500               # length of the response kept
 DECADE = 10                 # averaging window (years)
 LAT_MIN = 0.0               # keep latitudes >= LAT_MIN (degrees N)
@@ -102,47 +115,84 @@ def dim_like(da, *names):
     return None
 
 
-def surface_decadal(da):
-    """Surface level, lat >= LAT_MIN, decadal means of the first N_YEARS years."""
+def surface(da):
+    """Surface level and lat >= LAT_MIN, as (time, latitude, longitude) values."""
     tdim = dim_like(da, "t")
     zdim = dim_like(da, "depth", "lev", "z")
     ydim = dim_like(da, "lat")
     xdim = dim_like(da, "lon")
     if zdim is not None:
         da = da.isel({zdim: 0}, drop=True)
-    da = da.isel({tdim: slice(PULSE_START_INDEX, PULSE_START_INDEX + N_YEARS)})
-    if da.sizes[tdim] < N_YEARS:
-        raise ValueError(f"only {da.sizes[tdim]} years after the pulse start, need {N_YEARS}")
     da = da.where(da[ydim] >= LAT_MIN, drop=True)
-    da = da.rename({ydim: "latitude", xdim: "longitude"})
-    vals = da.transpose(tdim, "latitude", "longitude").values.astype("float32")
+    da = da.rename({ydim: "latitude", xdim: "longitude"}).transpose(tdim, "latitude", "longitude")
+    return da.values.astype("float32"), da["latitude"].values, da["longitude"].values
+
+
+def decadal_means(vals):
+    """Average the first N_YEARS annual steps into DECADE-yr means."""
+    if vals.shape[0] < N_YEARS:
+        raise ValueError(f"only {vals.shape[0]} years after the pulse start, need {N_YEARS}")
     n_dec = N_YEARS // DECADE
-    vals = vals[: n_dec * DECADE].reshape(n_dec, DECADE, *vals.shape[1:]).mean(axis=1)
-    return vals, da["latitude"].values, da["longitude"].values
+    return vals[: n_dec * DECADE].reshape(n_dec, DECADE, *vals.shape[1:]).mean(axis=1)
+
+
+def year_of(t):
+    return getattr(t, "year", None)
+
+
+def check_continuity(mode, parent_ds, pulse_ds):
+    """The pulse run should start the year after the prepended parent years."""
+    tp = parent_ds[dim_like(parent_ds[DYES[0]], "t")].values
+    tq = pulse_ds[dim_like(pulse_ds[DYES[0]], "t")].values
+    first, last, nxt = year_of(tp[0]), year_of(tp[PULSE_YEARS - 1]), year_of(tq[0])
+    n_total = PULSE_YEARS + len(tq)
+    msg = (f"  {mode:6s} pulse years {first}-{last} from parent, pulse run starts {nxt}, "
+           f"{n_total} yr in total")
+    if None not in (last, nxt) and nxt != last + 1:
+        msg += f"  <-- WARNING: expected pulse run to start in {last + 1}"
+    if n_total < N_YEARS:
+        msg += f"  <-- WARNING: fewer than N_YEARS={N_YEARS}"
+    print(msg)
 
 
 def export_fields(dry_run=False):
     modes = list(PULSE_EXPERIMENTS)
-    for mode, exp in PULSE_EXPERIMENTS.items():
-        files = experiment_files(exp)
-        print(f"  {mode:6s} {exp}: {len(files)} dye files")
-        for f in files:
-            print(f"         {f}")
+    for mode, exps in PULSE_EXPERIMENTS.items():
+        for role in ("parent", "pulse"):
+            files = experiment_files(exps[role])
+            print(f"  {mode:6s} {role:6s} {exps[role]}: {len(files)} dye files")
+            for f in files:
+                print(f"         {f}")
+    print("Time axes:")
+    opened = {}
+    for mode, exps in PULSE_EXPERIMENTS.items():
+        try:
+            opened[mode] = (open_experiment(exps["parent"]), open_experiment(exps["pulse"]))
+        except (FileNotFoundError, OSError) as err:
+            print(f"  {mode:6s} cannot open: {err}")
+            continue
+        check_continuity(mode, *opened[mode])
     if dry_run:
         return None
-    if any(e == "TODO" for e in PULSE_EXPERIMENTS.values()):
-        sys.exit("Fill in PULSE_EXPERIMENTS first.")
+    missing = [m for m in modes if m not in opened]
+    if missing:
+        sys.exit(f"Cannot export, experiments missing for: {', '.join(missing)}")
 
     kernel = None
     for m, mode in enumerate(modes):
-        ds = open_experiment(PULSE_EXPERIMENTS[mode])
+        parent_ds, pulse_ds = opened[mode]
         for d, dye in enumerate(DYES):
-            vals, lat, lon = surface_decadal(ds[dye])
+            head, lat, lon = surface(parent_ds[dye])
+            tail, lat2, lon2 = surface(pulse_ds[dye])
+            if not (np.array_equal(lat, lat2) and np.array_equal(lon, lon2)):
+                raise ValueError(f"{mode} {dye}: parent and pulse grids differ")
+            vals = decadal_means(np.concatenate([head[:PULSE_YEARS], tail], axis=0))
             if kernel is None:
                 kernel = np.full((len(modes), len(DYES), *vals.shape), np.nan, dtype="float32")
             kernel[m, d] = vals
             print(f"  {mode} {dye}: max {np.nanmax(vals):.4g}")
-        ds.close()
+        parent_ds.close()
+        pulse_ds.close()
 
     n_dec = kernel.shape[2]
     out = xr.Dataset(
@@ -161,10 +211,10 @@ def export_fields(dry_run=False):
                            "note": f"{DECADE}-yr means of annual output"}
     out.attrs = {
         "title": "HadCM3 dye-pulse impulse-response fields (surface)",
-        "experiments": ", ".join(f"{m}={e}" for m, e in PULSE_EXPERIMENTS.items()),
+        "experiments": ", ".join(f"{m}={e['pulse']} (pulse years from {e['parent']})"
+                                 for m, e in PULSE_EXPERIMENTS.items()),
         "pulse_years": str(PULSE_YEARS),
         "pulse_amplitude": str(PULSE_AMPLITUDE),
-        "pulse_start_index": PULSE_START_INDEX,
         "n_years": N_YEARS,
         "lat_min": LAT_MIN,
         "source_pattern": str(BASE_DIR / FILE_PATTERN),

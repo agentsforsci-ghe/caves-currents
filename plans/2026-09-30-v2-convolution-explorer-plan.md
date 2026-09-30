@@ -18,15 +18,19 @@ Decisions made:
 
 `scripts/export_pulse_kernels.py` has no dependency on this repo beyond xarray, numpy and netCDF4.
 
-- **Config block at the top:**
-  - `PULSE_EXPERIMENTS = {"cold": "TODO", "zonal": "TODO", "merid": "TODO"}`
-  - `BASE_DIR = /nfs/annie/earpal/database/experiments`
-  - `PULSE_YEARS` (length of the pulse) and `PULSE_AMPLITUDE` (dye units), which are written as attributes.
+- **Config block at the top.** It is pre-filled from `old script/Create_impulsets.ipynb`:
+  - pulse runs xpran (cold), xprao (zonal) and xpujc (merid);
+  - each pulse run starts after its 10-yr pulse, so the first 10 yr of the parent constant run (xpraj, xprak, xpral) are prepended;
+  - the merid parent is to be confirmed, because the notebook names an unloaded `xpram`;
+  - `BASE_DIR = /nfs/annie/earpal/database/experiments`;
+  - `PULSE_YEARS = 10`.
+  - A time-axis continuity check warns if a pulse run does not start the year after its prepended years.
 - **Reading:** open `{exp}/time_series/{exp}.dye0?.annual.nc` with the same pattern as `open_experiment()` in the meltmodel `mymodules/dyefield_computation.py`, renamed to dye00–08.
+- **NISA in the notebook** used Miguel's `moisturesource.nc` recharge weights. v2 uses the trajectory uptake masks instead, so the NISA cross-check will differ somewhat.
 - **Processing:**
   - Keep the surface level only.
   - Keep latitudes ≥ 0°N.
-  - Keep the first 500 years from the pulse start, averaged to decadal means (50 steps, `resample(t="10Y")` as in the notebook).
+  - Keep 500 years from the pulse start (10 parent years plus 490 pulse-run years), averaged to decadal means (50 steps).
   - Store as float32 with zlib compression.
 - **Output:** `pulse_kernels_surface.nc`, with dimensions (mode, dye, t_decade, lat, lon) and provenance attributes. Estimated size is about 110 MB uncompressed and about 30–50 MB compressed.
 - **Optional:** if `NA_pulses_dict.pkl` and `regions.pkl` are found, also write their NISA, PS and NA point kernels to `notebook_point_kernels.nc`. They serve only as a cross-check.
