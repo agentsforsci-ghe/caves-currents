@@ -1,0 +1,302 @@
+---
+title: "Where the meltwater arrives: source-region contributions at nine proxy sites (forward model v2)"
+author: "Laura Endres"
+date: today
+format:
+  docx:
+    toc: false
+    fig-dpi: 300
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+source("R/site_metrics.R")
+library(purrr); library(jsonlite)
+
+fmt <- function(x, d = 2) formatC(x, format = "f", digits = d, big.mark = ",")
+pct <- function(x, d = 0) fmt(100 * x, d)
+
+win  <- c(21500, 10000)
+d    <- read_site_anomaly()
+g    <- to_grid(d, step = 500, window = win)
+m    <- site_metrics(g)
+info <- fromJSON("outputs/convolution/run_info.json")
+chk  <- read_csv("outputs/convolution/scaling_check.csv", show_col_types = FALSE)
+
+sites <- c("La Vallina (NISA)", "Cave Without a Name", "NGRIP", "MD95-2010", "PS2644-5",
+           "MD03-2664", "ODP980", "MD95-2042", "MD02-2552")
+short <- c(EIS_MedSea = "Med", EIS_BayOfBiscay = "Bri", EIS_NorwegianSea = "Fen", EIS_Arctic = "EurArc",
+           LAU_Arctic = "AmeArc", GIS_GreenlandSea = "GIS", LAU_LabradorSea = "NLau",
+           LAU_StLawrence = "SLau", LAU_GulfOfMexico = "GoM")
+theme_ms <- theme_bw(base_size = 9) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major = element_line(linewidth = 0.2, colour = "grey90"),
+        strip.background = element_blank(), strip.text = element_text(face = "bold", hjust = 0))
+
+ss   <- site_summary(m)
+mix  <- ss |> filter(pathway == "mixed")
+top  <- function(f, s, what = "important") mix[[what]][mix$forcing == f & mix$site == s]
+topv <- function(f, s, what = "share") mix[[what]][mix$forcing == f & mix$site == s]
+shr  <- function(s) { v <- sort(mix$share[mix$site == s]); paste0(pct(v[1]), "–", pct(v[2])) }
+agree <- mix |> select(forcing, site, important) |> pivot_wider(names_from = forcing, values_from = important) |>
+  mutate(same = `GLAC-1D` == `ICE-6G`)
+n_agree <- sum(agree$same)
+n_fen_abrupt <- sum(mix$abrupt == "EIS_NorwegianSea")
+robust <- ss |> group_by(forcing, site) |> summarise(same = n_distinct(important) == 1, .groups = "drop")
+n_robust <- sum(robust$same)
+
+# Worked example for the metric explanations: NISA, GLAC-1D, mixed pathway.
+ex <- m |> filter(site == "La Vallina (NISA)", forcing == "GLAC-1D", pathway == "mixed")
+ex_top <- ex |> slice_max(share, n = 1)
+ex_dom <- ex |> slice_max(dom, n = 1)
+ex_sd  <- ex |> slice_max(sd, n = 1)
+ex_vs  <- ex |> slice_max(vshare, n = 1)
+ex_ab  <- ex |> slice_max(sd_diff, n = 1)
+
+# Kernel checks (cold and zonal can be compared with the paper's equilibrium weights).
+w_site <- chk |> filter(!is.na(equilibrium_weight)) |> group_by(site, mode) |>
+  summarise(r = sum(response_500yr) / sum(equilibrium_weight), .groups = "drop")
+```
+
+# Summary
+
+The meltwater anomaly at each of the nine proxy sites of Endres et al.
+(2026b) was computed with the forward model: the regional meltwater forcing
+of GLAC-1D or ICE-6G, convolved with the HadCM3 response to a dye pulse from
+each of the nine input regions. This replaces the equilibrium approximation
+of the previous report with the real pulse responses, so meltwater now
+arrives late and spread out, as it does in the ocean model.
+
+- The two ice-sheet reconstructions agree on the most important source region
+  at `r n_agree` of the 9 sites, in the mixed AMOC pathway, 21.5–10 ka.
+- At La Vallina (NISA), GLAC-1D makes `r top("GLAC-1D", "La Vallina (NISA)")`
+  the most important source (`r pct(topv("GLAC-1D", "La Vallina (NISA)"))` % of
+  the anomaly). ICE-6G makes it `r top("ICE-6G", "La Vallina (NISA)")`
+  (`r pct(topv("ICE-6G", "La Vallina (NISA)"))` %).
+- The two sites near the Gulf of Mexico are dominated by LAU_GulfOfMexico in
+  both reconstructions: `r shr("MD02-2552")` % of the anomaly at MD02-2552 and
+  `r shr("Cave Without a Name")` % at Cave Without a Name (Texas).
+- EIS_NorwegianSea is the most abrupt contributor in `r n_fen_abrupt` of the
+  18 site and reconstruction combinations.
+- The most important region does not depend on the AMOC pathway for
+  `r n_robust` of the 18 site and reconstruction combinations.
+
+# What the five numbers mean
+
+The spider figures compare the source regions at one site with five numbers.
+Each asks a simple question about the region's contribution to the δ¹⁸O
+anomaly at that site. All five are computed on a common 500-yr grid between
+21.5 and 10 ka. The example values are for NISA under GLAC-1D in the mixed
+pathway.
+
+**Share: how much of the signal comes from this region?** Average the
+region's contribution over time, and divide by the sum of these averages over
+all nine regions. The shares add up to 100 %. At NISA,
+`r ex_top$region` has the largest share, `r pct(ex_top$share)` %.
+
+**Dominant: how often is this region the biggest contributor?** Count the
+500-yr steps in which the region contributes more than any other region, and
+divide by the number of steps. A region can have a modest share but still
+dominate for part of the time, for example during one large pulse. At NISA,
+`r ex_dom$region` is the largest contributor in `r pct(ex_dom$dom)` % of the
+steps.
+
+**SD: how much does this region's contribution swing?** The standard
+deviation of the region's contribution over time, in ‰. A region that
+delivers a steady trickle has a small SD even if its share is large. At NISA,
+`r ex_sd$region` swings the most (SD `r fmt(ex_sd$sd, 3)` ‰).
+
+**Var. share: how much of the ups and downs of the total does this region
+cause?** The covariance of the region's contribution with the total,
+divided by the variance of the total, Cov(region, total) / Var(total). These
+shares also add up to 100 %. A region that swings a lot, at the same times
+as the total, gets a large value. A region that swings against the others can
+get a negative value. At NISA, `r ex_vs$region` explains
+`r pct(ex_vs$vshare)` % of the variance of the total.
+
+**SD Δ: how abrupt is this region?** The standard deviation of the changes
+from one 500-yr step to the next, in ‰. It is large when the region's
+contribution jumps quickly, and small when it only drifts. At NISA,
+`r ex_ab$region` is the most abrupt (SD Δ `r fmt(ex_ab$sd_diff, 3)` ‰).
+
+In the spider figures, each of these numbers is one spoke. Each spoke is
+scaled to the largest value of that number at the same site, so the outer
+ring marks the site's maximum, and shapes can be compared between regions and
+between the two reconstructions.
+
+# Data and methods
+
+**Forward model.** The source-region δ¹⁸O anomaly of each region (−35 ‰
+end-member) is interpolated to 10-yr steps and convolved with the HadCM3
+surface response to a 10-yr dye pulse in that region. The pulse responses
+come from the runs xpran (cold), xprao (zonal) and xpujc (meridional). The
+mixed pathway switches between them on the deglacial schedule. Water keeps
+the response of the mode it was released in. A one-page schematic is at
+https://claude.ai/artifact/CqfLtTKp2MCwDi9L8YFa6x.
+
+**Proxy sites.** Ocean cores take the latitude-weighted mean over a ±2° box.
+Speleothems and the ice core weight the surface field by the moisture uptake
+of their precipitation, from the back-trajectory runs of Endres et al.
+(2026b).
+
+**Checks on the pulse responses.** The 50 decadal responses add up to the
+500-yr constant-input equilibrium. At each site, the ratio of the summed
+response to the equilibrium weights of Endres et al. (2026b) lies between
+`r fmt(min(w_site$r))` and `r fmt(max(w_site$r))` for the cold and zonal
+modes (median over all site, mode and region cells
+`r fmt(median(chk$ratio, na.rm = TRUE))`). A constant forcing therefore
+reaches the paper's equilibrium anomaly. What the forward model changes is
+the timing: short pulses arrive later and more spread out.
+
+**Metrics.** The decadal site series were averaged into
+`r length(unique(g$age))` steps of 500 years between 21.5 and 10 ka. This is
+the rule of the previous report: GLAC-1D has 100-yr and ICE-6G 500-yr native
+steps, and a common grid keeps resolution from looking like variability.
+
+# Results
+
+```{r}
+#| label: fig-totals
+#| fig-cap: "Total δ¹⁸O anomaly at the nine proxy sites, mixed AMOC pathway, decadal steps. Blue: GLAC-1D; orange: ICE-6G. The panels have their own vertical scales."
+#| fig-width: 7
+#| fig-height: 6
+tot <- d |> filter(pathway == "mixed", time_bp <= win[1], time_bp >= win[2]) |>
+  group_by(forcing, site, time_bp) |> summarise(anom = sum(anom), .groups = "drop") |>
+  mutate(site = factor(site, levels = sites))
+ggplot(tot, aes(time_bp / 1000, anom, colour = forcing)) +
+  geom_line(linewidth = 0.4) +
+  facet_wrap(~site, ncol = 3, scales = "free_y") +
+  scale_x_reverse(breaks = seq(21, 10, -3)) +
+  scale_colour_manual(values = rec_col, name = NULL) +
+  labs(x = "Age (ka BP)", y = expression(delta^18*O ~ "anomaly at the site (‰)")) +
+  theme_ms + theme(legend.position = "bottom")
+```
+
+@fig-totals shows the total anomaly at each site. @tbl-summary lists, for
+each site, the region with the largest share, the largest SD and the largest
+SD Δ in the mixed pathway. @tbl-pathways shows whether the most important
+region changes with the AMOC pathway.
+
+```{r}
+#| label: tbl-summary
+#| tbl-cap: "Mixed pathway, 21.5–10 ka, 500-yr grid. Most important: largest share (in brackets). Most variable: largest SD. Most abrupt: largest SD Δ."
+mix |> mutate(site = factor(site, levels = sites)) |> arrange(site, forcing) |>
+  transmute(Site = as.character(site), Forcing = forcing,
+            `Most important` = sprintf("%s (%s %%)", important, pct(share)),
+            `Most variable` = variable, `Most abrupt` = abrupt) |>
+  mutate(Site = ifelse(duplicated(Site), "", Site)) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: tbl-pathways
+#| tbl-cap: "Most important source region per AMOC pathway. Codes: Med EIS_MedSea, Bri EIS_BayOfBiscay, Fen EIS_NorwegianSea, EurArc EIS_Arctic, AmeArc LAU_Arctic, GIS GIS_GreenlandSea, NLau LAU_LabradorSea, SLau LAU_StLawrence, GoM LAU_GulfOfMexico."
+ss |> mutate(site = factor(site, levels = sites), col = paste(forcing, pathway),
+             important = short[important]) |>
+  select(site, col, important) |>
+  pivot_wider(names_from = col, values_from = important) |>
+  arrange(site) |>
+  select(Site = site, `GLAC-1D cold`, `GLAC-1D zonal`, `GLAC-1D mixed`, `ICE-6G cold`, `ICE-6G zonal`, `ICE-6G mixed`) |>
+  knitr::kable()
+```
+
+## Region profiles per site
+
+The following figures show the five numbers for every source region at one
+site, for GLAC-1D and ICE-6G in the mixed pathway. A large polygon means that
+the region matters at that site. Where the blue and orange polygons differ,
+the two reconstructions disagree about that region.
+
+```{r}
+#| label: fig-spider-nisa
+#| fig-cap: "La Vallina (NISA), speleothem. Five numbers per source region (Share, Dominant, SD, Var. share, SD Δ), mixed pathway, 21.5–10 ka. Each spoke is scaled to the site's largest value of that number. Blue: GLAC-1D; orange: ICE-6G."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "La Vallina (NISA)")
+```
+
+```{r}
+#| label: fig-spider-cwn
+#| fig-cap: "Cave Without a Name, speleothem. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "Cave Without a Name")
+```
+
+```{r}
+#| label: fig-spider-ngrip
+#| fig-cap: "NGRIP, ice core. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "NGRIP")
+```
+
+```{r}
+#| label: fig-spider-md952010
+#| fig-cap: "MD95-2010, Norwegian Sea core. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "MD95-2010")
+```
+
+```{r}
+#| label: fig-spider-ps2644
+#| fig-cap: "PS2644-5, Denmark Strait core. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "PS2644-5")
+```
+
+```{r}
+#| label: fig-spider-md032664
+#| fig-cap: "MD03-2664, Labrador Sea core. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "MD03-2664")
+```
+
+```{r}
+#| label: fig-spider-odp980
+#| fig-cap: "ODP980, Feni Drift core. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "ODP980")
+```
+
+```{r}
+#| label: fig-spider-md952042
+#| fig-cap: "MD95-2042, Iberian margin core. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "MD95-2042")
+```
+
+```{r}
+#| label: fig-spider-md022552
+#| fig-cap: "MD02-2552, Gulf of Mexico core. As for NISA."
+#| fig-width: 7
+#| fig-height: 7
+spider_plot(m, "MD02-2552")
+```
+
+# Caveats
+
+- **Linearity.** The source anomaly is linear in discharge. Endres et al.
+  (2026b) use a mixing fraction that saturates for large inputs, so the
+  largest pulses are overstated here.
+- **Fixed boundary conditions.** The cold and zonal pulse responses come from
+  17.8 ka simulations. The boundary conditions of the meridional parent run
+  (xpram) are not yet confirmed. The AMOC modes switch abruptly on a fixed
+  schedule.
+- **Meridional kernel.** The meridional pulse run branches from xpram, not
+  from the paper's meridional run (xpral). It is used only in the mixed
+  pathway between 14.7 and 13.7 ka.
+- **Land sites.** NISA is weighted by the trajectory uptake masks. The 2025.05
+  convolution notebook used a different moisture-source field, which gave a
+  smaller NISA anomaly with the same timing.
+- **Metrics.** The numbers describe the forward model, not the proxy
+  records. Spokes are scaled per site, so a large polygon at one site cannot
+  be compared in absolute terms with a large polygon at another.

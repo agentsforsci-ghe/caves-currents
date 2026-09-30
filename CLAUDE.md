@@ -11,6 +11,7 @@ is Laura Endres.
 |---|---|---|
 | 1 | Age range of Glas | `glas_age_range.qmd` / `.docx` |
 | 2 | Most important and most variable meltwater source at NISA; alignment of abrupt Glas δ¹⁸O shifts with discharge | `nisa_meltwater_sources.qmd` / `.docx`, plus the explorer in `app/` |
+| 2 (v2) | Source-region contributions at the nine proxy sites from the forward-model convolution, with spider figures and a plain-language explanation of the five metrics | `site_anomalies_v2.qmd` / `.docx` (about 10 s to render) |
 | 3 | Age range of the Lake Gerzensee record | Open. No Gerzensee data is in `data/` yet |
 
 ## Layout
@@ -24,6 +25,7 @@ is Laura Endres.
   - `scripts/`: `export_pulse_kernels.py` (runs on the Leeds server), `make_uptake_weights.py`, `make_region_geojson.py` and `run_convolution.py`.
   - Outputs go to `outputs/convolution/`.
   - New forcings are one entry in `myconfig/FORCINGS.py`, and new sites one entry in `myconfig/SITES.py`.
+- `R/site_metrics.R`: reusable R helpers for any report. They read `outputs/convolution/site_anomaly.csv.gz`, average it onto a 500-yr grid, compute the five metrics (share, dominance, SD, variance share, SD of changes) and draw one site's spider figure.
 - `data/kernels/`: the HadCM3 pulse-kernel bundle. It is **untracked** (see its README for how to make it). `data/meltmodel/uptake_weights.nc` holds the land-site moisture-uptake fields regridded from the trajectories.
 - `plans/`: plans written before large tasks, dated.
 - `prompts/`: verbatim prompt archive written by the commit skill (`YYYY-MM-DD-NNN-slug.md`).
