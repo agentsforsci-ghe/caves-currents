@@ -22,8 +22,9 @@ Leeds server with `scripts/export_pulse_kernels.py`, then copy them here.
    The system `python` on the server may be Python 2, which fails with
    `SyntaxError` at the first f-string. Use the notebooks' environment
    instead, `/nfs/annie/eelse/conda/envs/py3/bin/python`, or run
-   `conda activate py3` first. It should find 9 dye files
-   per experiment. It also prints each time axis and warns if a pulse run does
+   `conda activate py3` first. It should find 9 of 9 dye files
+   (dye00–dye08) per experiment. Some runs also carry a 10th tracer, `dye09`,
+   which is not one of the nine input regions; it is listed as "not used". It also prints each time axis and warns if a pulse run does
    not start the year after its prepended pulse years.
 4. Run `python export_pulse_kernels.py` in the same environment. It needs
    numpy, xarray, dask and netCDF4.

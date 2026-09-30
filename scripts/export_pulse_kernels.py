@@ -67,9 +67,11 @@ PULSE_EXPERIMENTS = {
 }
 
 # Same layout as mymodules/dyefield_computation.py in the meltmodel repo:
-# BASE_DIR/<exp>/time_series/<exp>.dye0?.annual.nc
+# BASE_DIR/<exp>/time_series/<exp>.dyeNN.annual.nc, one file per dye.
+# Some runs carry a 10th tracer (dye09) that is not one of the nine input
+# regions; only dye00-dye08 are read (the notebook also left dye09 out).
 BASE_DIR = Path("/nfs/annie/earpal/database/experiments")
-FILE_PATTERN = "{exp}/time_series/{exp}.dye0?.annual.nc"
+FILE_PATTERN = "{exp}/time_series/{exp}.{dye}.annual.nc"
 
 # Pulse design: 10 yr of the constant-input run's dye flux, then zero.
 PULSE_YEARS = 10
@@ -97,17 +99,37 @@ REGION_CODES = ["Med", "Bri", "Fen", "EurArc", "AmeArc", "GIS", "NLau", "SLau", 
 # =============================================================================
 
 def experiment_files(exp):
-    return sorted(BASE_DIR.glob(FILE_PATTERN.format(exp=exp)))
+    """The nine region-dye files of an experiment (missing ones left out)."""
+    files = [BASE_DIR / FILE_PATTERN.format(exp=exp, dye=d) for d in DYES]
+    return [f for f in files if f.exists()]
+
+
+def extra_files(exp):
+    """Dye files present but not used (e.g. dye09)."""
+    used = set(experiment_files(exp))
+    pattern = FILE_PATTERN.format(exp=exp, dye="dye*")
+    return sorted(f for f in BASE_DIR.glob(pattern) if f not in used)
 
 
 def open_experiment(exp):
-    """Open one experiment, rename dye variables to dye00...dye08."""
+    """Open dye00...dye08 of one experiment, one file per dye.
+
+    Each file is named after its dye, so the variable inside is renamed by
+    file, not by position in a merged dataset.
+    """
     files = experiment_files(exp)
-    if len(files) != 9:
+    if len(files) != len(DYES):
         raise FileNotFoundError(
-            f"{exp}: expected 9 dye files under {BASE_DIR / exp}, found {len(files)}")
-    ds = xr.open_mfdataset([str(f) for f in files], combine="by_coords", chunks={})
-    return ds.rename_vars({old: DYES[i] for i, old in enumerate(ds.data_vars)})
+            f"{exp}: expected {len(DYES)} dye files (dye00-dye08) under {BASE_DIR / exp}, "
+            f"found {len(files)}")
+    parts = {}
+    for dye, f in zip(DYES, files):
+        ds = xr.open_dataset(f, chunks={})
+        vars4d = [v for v in ds.data_vars if ds[v].ndim >= 3]
+        if len(vars4d) != 1:
+            raise ValueError(f"{f}: expected one gridded variable, found {vars4d}")
+        parts[dye] = ds[vars4d[0]]
+    return xr.Dataset(parts)
 
 
 def dim_like(da, *names):
@@ -163,9 +185,11 @@ def export_fields(dry_run=False):
     for mode, exps in PULSE_EXPERIMENTS.items():
         for role in ("parent", "pulse"):
             files = experiment_files(exps[role])
-            print(f"  {mode:6s} {role:6s} {exps[role]}: {len(files)} dye files")
+            print(f"  {mode:6s} {role:6s} {exps[role]}: {len(files)} of {len(DYES)} dye files")
             for f in files:
                 print(f"         {f}")
+            for f in extra_files(exps[role]):
+                print(f"         (not used) {f.name}")
     print("Time axes:")
     opened = {}
     for mode, exps in PULSE_EXPERIMENTS.items():
