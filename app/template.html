@@ -22,8 +22,10 @@
   --m-cold: #c9d3db; --m-zonal: #e7ecf0; --m-merid: #aebbc6;
   /* region colours: paper figures (tab10), tuned to pass the CVD checks */
   --r-Med: #1f77b4; --r-Bri: #f1780b; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #9b4c3c; --r-NLau: #de72bd; --r-SLau: #a5a608; --r-GulofMex: #00b3c3;
-  /* sequential ramp for freshening magnitude, near-zero first */
-  --s1: #e3eefb; --s2: #9ec5f4; --s3: #5598e7; --s4: #256abf; --s5: #0d366b;
+  /* field colour maps (Crameri 2018): hawaii, small to large freshening; vik, diverging for GLAC-1D minus ICE-6G */
+  --cm-1: #b3f2fd; --cm-2: #66e8d3; --cm-3: #6cd48c; --cm-4: #8abc48; --cm-5: #9c951c; --cm-6: #9b6d29; --cm-7: #964d3e; --cm-8: #922d56; --cm-9: #8c0273;
+  --casing: #16212a;      /* dark edge under region outlines, so they read on any field colour */
+  --dv-1: #001261; --dv-2: #034481; --dv-3: #307da6; --dv-4: #94bed2; --dv-5: #ece5e0; --dv-6: #dbaa8d; --dv-7: #c27041; --dv-8: #912d06; --dv-9: #590008;
   --plume-0: #1c5cab; --plume-1: #9ec5f4;   /* forward-model schematic */
   --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -36,8 +38,8 @@
     --accent: #86b6ef; --focus: #f08a5d;
     --warn-bg: #3a2a0c; --warn-fg: #f5d9a3; --warn-edge: #8a6420;
     --m-cold: #2b3640; --m-zonal: #1c252d; --m-merid: #3a4855;
+    --casing: #05080b;
     --r-Med: #1f77b4; --r-Bri: #db6b00; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #a15142; --r-NLau: #cd63ad; --r-SLau: #959600; --r-GulofMex: #03a2b1;
-    --s1: #1a2835; --s2: #184f95; --s3: #2a78d6; --s4: #6da7ec; --s5: #cde2fb;
     --plume-0: #6da7ec; --plume-1: #184f95;
     color-scheme: dark;
   }
@@ -48,8 +50,8 @@
   --accent: #86b6ef; --focus: #f08a5d;
   --warn-bg: #3a2a0c; --warn-fg: #f5d9a3; --warn-edge: #8a6420;
   --m-cold: #2b3640; --m-zonal: #1c252d; --m-merid: #3a4855;
+  --casing: #05080b;
   --r-Med: #1f77b4; --r-Bri: #db6b00; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #a15142; --r-NLau: #cd63ad; --r-SLau: #959600; --r-GulofMex: #03a2b1;
-  --s1: #1a2835; --s2: #184f95; --s3: #2a78d6; --s4: #6da7ec; --s5: #cde2fb;
   --plume-0: #6da7ec; --plume-1: #184f95;
   color-scheme: dark;
 }
@@ -85,6 +87,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focu
 .globe .status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; padding: 8px 12px; font-size: 13px; color: var(--fg-2); max-width: 80%; text-align: center; }
 svg { display: block; width: 100%; height: auto; }
 .region { fill: none; stroke-width: 1.7; pointer-events: visibleStroke; cursor: default; }
+.region-casing { fill: none; stroke: var(--casing); stroke-width: 3.6; stroke-opacity: 0.75; pointer-events: none; }
 .region.sel { stroke-width: 3; }
 .site { stroke: var(--panel); stroke-width: 1.4; fill: var(--fg-2); cursor: pointer; }
 .site.on { fill: var(--focus); }
@@ -96,6 +99,8 @@ svg { display: block; width: 100%; height: auto; }
 .legend-bar .bar { height: 10px; border-radius: 2px; border: 1px solid var(--rule); }
 .legend-bar .ticks { grid-column: 2; position: relative; height: 14px; }
 .legend-bar .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.legend-bar .ends { grid-column: 2; display: flex; justify-content: space-between; gap: 8px; font: 11.5px var(--font-body); color: var(--fg-2); }
+#view-seg { justify-self: start; }
 .note { font-size: 12px; color: var(--fg-3); margin: 0; }
 .readout { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; }
 .readout .v { font: 600 24px/1 var(--font-display); font-variant-numeric: tabular-nums; }
@@ -179,13 +184,17 @@ header .btn { align-self: center; }
   <div class="main">
     <section class="card" aria-label="Surface anomaly map">
       <div class="maphead"><h2 id="map-title">Surface δ¹⁸O anomaly</h2><span class="modechip" id="modechip"></span></div>
+      <div class="seg" role="group" aria-label="Map view" id="view-seg">
+        <button type="button" data-view="anomaly" aria-pressed="true">Surface anomaly</button>
+        <button type="button" data-view="diff" aria-pressed="false" id="view-diff">Difference</button>
+      </div>
       <div class="globe" id="globe">
         <canvas id="field" aria-hidden="true"></canvas>
         <svg id="overlay" viewBox="0 0 600 560" role="img" aria-label="Globe centred on the North Atlantic with the surface anomaly, the nine input regions and the proxy sites"></svg>
         <div class="status" id="status" hidden></div>
       </div>
-      <div class="legend-bar"><span>−‰</span><div class="bar" id="leg-bar"></div><div class="ticks" id="leg-ticks"></div></div>
-      <p class="note">Colour: size of the negative (freshening) surface δ¹⁸O anomaly on a log scale, the same for every forcing and pathway. Below 0.005 ‰ shows as open ocean. Outlines: the HadCM3 cells where each region's meltwater enters the ocean. Dots: proxy sites; click one to show it in the chart.</p>
+      <div class="legend-bar"><span id="leg-unit">−‰</span><div class="bar" id="leg-bar"></div><div class="ticks" id="leg-ticks"></div><div class="ends" id="leg-ends"></div></div>
+      <p class="note" id="map-note"></p>
     </section>
 
     <section class="card" aria-label="Site time series">
@@ -231,7 +240,7 @@ const DATA = /*__DATA__*/null;
   const MODE_LABEL = { cold: "Cold (weak AMOC)", zonal: "Zonal (strong AMOC)", merid: "Meridional" };
 
   const state = { forcing: FORCINGS[0], pathway: PATHWAYS.includes("mixed") ? "mixed" : PATHWAYS[0],
-    site: "La Vallina (NISA)", age: 15000, sel: null, table: false, playing: false, speed: 250, howto: false };
+    site: "La Vallina (NISA)", age: 15000, sel: null, table: false, playing: false, speed: 250, howto: false, view: "anomaly" };
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const colorOf = k => css("--r-" + k);
@@ -254,16 +263,38 @@ const DATA = /*__DATA__*/null;
   const SC = FR.scale, SPAN = Math.log(SC.vmax / SC.vmin);
   const qToVal = q => SC.vmin * Math.exp((q - 1) / 254 * SPAN);
   const valToQ = v => v < SC.vmin ? 0 : Math.min(255, 1 + Math.round(254 * Math.log(v / SC.vmin) / SPAN));
-  let LUT = [];
+  // Difference GLAC-1D minus ICE-6G: symmetric log around q = 128 (see scripts/export_app_frames.py).
+  const DF = FR.diff, DSC = DF.scale, DSPAN = Math.log(DSC.vmax / DSC.vmin);
+  const dqToVal = q => q === 128 ? 0 : Math.sign(q - 128) * DSC.vmin * Math.exp((Math.abs(q - 128) - 1) / 126 * DSPAN);
+  const isDiff = () => state.view === "diff";
+  const cmap = () => d3.interpolateRgbBasis(d3.range(1, 10).map(i => css("--cm-" + i)));
+  const dmap = () => d3.interpolateRgbBasis(d3.range(1, 10).map(i => css("--dv-" + i)));
+  let LUT = [], DLUT = [];
   function buildLut() {
-    const interp = d3.interpolateRgbBasis(["--s1", "--s2", "--s3", "--s4", "--s5"].map(css));
-    LUT = d3.range(256).map(q => q === 0 ? null : interp((q - 1) / 254));
+    const c = cmap(), d = dmap();
+    LUT = d3.range(256).map(q => q === 0 ? null : c((q - 1) / 254));
+    // position 0.5 is the neutral middle of vik; blue (GLAC-1D fresher) below, brown above
+    DLUT = d3.range(256).map(q => d(0.5 + 0.5 * Math.sign(q - 128) * (Math.abs(q - 128) / 127)));   // 128: neutral middle
   }
   function drawLegendBar() {
-    $("leg-bar").style.background = `linear-gradient(to right, ${d3.range(0, 1.001, 0.1).map(p => d3.interpolateRgbBasis(["--s1", "--s2", "--s3", "--s4", "--s5"].map(css))(p)).join(",")})`;
-    const ticks = [0.01, 0.03, 0.1, 0.3, 1, 3].filter(v => v >= SC.vmin && v <= SC.vmax);
-    const host = $("leg-ticks"); host.replaceChildren();
-    ticks.forEach(v => { const s = document.createElement("span"); s.style.left = (100 * Math.log(v / SC.vmin) / SPAN) + "%"; s.textContent = v; host.appendChild(s); });
+    const host = $("leg-ticks"), ends = $("leg-ends"); host.replaceChildren(); ends.replaceChildren();
+    const tick = (pos, text) => { const s = el("span", "", text); s.style.left = pos + "%"; host.append(s); };
+    if (!isDiff()) {
+      const c = cmap();
+      $("leg-bar").style.background = `linear-gradient(to right, ${d3.range(0, 1.001, 0.05).map(p => c(p)).join(",")})`;
+      $("leg-unit").textContent = "−‰";
+      [0.01, 0.03, 0.1, 0.3, 1, 3].filter(v => v >= SC.vmin && v <= SC.vmax).forEach(v => tick(100 * Math.log(v / SC.vmin) / SPAN, v));
+      ends.hidden = true;
+      return;
+    }
+    const d = dmap();
+    $("leg-bar").style.background = `linear-gradient(to right, ${d3.range(0, 1.001, 0.05).map(p => d(p)).join(",")})`;
+    $("leg-unit").textContent = "Δ‰";
+    const pos = v => 50 + 50 * Math.sign(v) * Math.log(Math.abs(v) / DSC.vmin) / DSPAN;
+    [-1, -0.1, 0.1, 1].filter(v => Math.abs(v) >= DSC.vmin && Math.abs(v) <= DSC.vmax).forEach(v => tick(pos(v), (v > 0 ? "+" : "−") + Math.abs(v)));
+    tick(50, "0");
+    ends.hidden = false;
+    ends.append(el("span", "", `${DATA.forcings[DF.a].label} fresher`), el("span", "", `${DATA.forcings[DF.b].label} fresher`));
   }
 
   // ---- globe geometry --------------------------------------------------------
@@ -293,12 +324,13 @@ const DATA = /*__DATA__*/null;
 
   // ---- frames: fetched per forcing x pathway ----------------------------------
   const cache = new Map(), pending = new Map();
-  const frameKey = () => `${state.forcing}_${state.pathway}`;
+  const frameKey = () => isDiff() ? `diff_${state.pathway}` : `${state.forcing}_${state.pathway}`;
+  const frameFile = key => key.startsWith("diff_") ? DF.files[key.slice(5)] : FR.files[key];
   function loadFrames(key) {
     if (cache.has(key)) return Promise.resolve(cache.get(key));
     if (pending.has(key)) return pending.get(key);
     // Frames are gzip + base64 text (artifacts serve text, not raw binary).
-    const p = fetch(FR.files[key]).then(r => { if (!r.ok) throw new Error(r.status + " " + r.statusText); return r.text(); })
+    const p = fetch(frameFile(key)).then(r => { if (!r.ok) throw new Error(r.status + " " + r.statusText); return r.text(); })
       .then(t => { const bin = atob(t.trim()); const z = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) z[i] = bin.charCodeAt(i);
         return new Response(new Blob([z]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(); })
       .then(b => { const u = new Uint8Array(b); if (u.length !== AGES.length * NCELL) throw new Error("unexpected file size"); cache.set(key, u); pending.delete(key); return u; })
@@ -324,7 +356,7 @@ const DATA = /*__DATA__*/null;
     const buckets = new Map();
     for (let i = 0; i < NCELL; i++) {
       if (!visible[i]) continue;
-      const q = u[off + i]; if (!q) continue;
+      const q = u[off + i]; if (!isDiff() && !q) continue;
       let b = buckets.get(q); if (!b) { b = []; buckets.set(q, b); } b.push(i);
     }
     for (const [q, cells] of buckets) {
@@ -333,7 +365,7 @@ const DATA = /*__DATA__*/null;
         const o = i * 8;
         ctx.moveTo(quads[o], quads[o + 1]); ctx.lineTo(quads[o + 2], quads[o + 3]); ctx.lineTo(quads[o + 4], quads[o + 5]); ctx.lineTo(quads[o + 6], quads[o + 7]); ctx.closePath();
       }
-      ctx.fillStyle = LUT[q]; ctx.fill();
+      ctx.fillStyle = (isDiff() ? DLUT : LUT)[q]; ctx.fill();
     }
   }
   function showStatus(msg) { const s = $("status"); s.textContent = msg || ""; s.hidden = !msg; }
@@ -355,6 +387,7 @@ const DATA = /*__DATA__*/null;
     svg.append("path").attr("d", path(grat)).attr("fill", "none").attr("stroke", css("--grat")).attr("stroke-width", 0.5).attr("opacity", 0.8);
     svg.append("path").attr("d", path(land)).attr("fill", css("--land")).attr("stroke", css("--land-edge")).attr("stroke-width", 0.5);
     svg.append("path").attr("d", path({ type: "Sphere" })).attr("fill", "none").attr("stroke", css("--rule"));
+    svg.append("g").selectAll("path").data(DATA.geo.features).join("path").attr("class", "region-casing").attr("d", path);
     svg.append("g").selectAll("path").data(DATA.geo.features).join("path")
       .attr("class", d => "region" + (state.sel === d.properties.code ? " sel" : ""))
       .attr("d", path).style("stroke", d => colorOf(d.properties.code))
@@ -386,7 +419,13 @@ const DATA = /*__DATA__*/null;
     const q = u[frameIdx(state.age) * NCELL + i];
     const box = el("div");
     box.append(el("div", "t", `${Math.abs(ll[1]).toFixed(1)}°${ll[1] >= 0 ? "N" : "S"}, ${Math.abs(ll[0]).toFixed(1)}°${ll[0] >= 0 ? "E" : "W"} · ${ka(AGES[frameIdx(state.age)])} ka`));
-    box.append(row(null, "Surface δ¹⁸O anomaly", q ? `≈ −${qToVal(q) < 0.1 ? qToVal(q).toFixed(3) : qToVal(q).toFixed(2)} ‰` : "< 0.005 ‰"));
+    if (isDiff()) {
+      const v = dqToVal(q), a = Math.abs(v);
+      box.append(row(null, `${DATA.forcings[DF.a].label} − ${DATA.forcings[DF.b].label}`, q === 128 ? "< 0.005 ‰" : `≈ ${v < 0 ? "−" : "+"}${a < 0.1 ? a.toFixed(3) : a.toFixed(2)} ‰`));
+      if (q !== 128) box.append(row(null, "Fresher in", DATA.forcings[v < 0 ? DF.a : DF.b].label));
+    } else {
+      box.append(row(null, "Surface δ¹⁸O anomaly", q ? `≈ −${qToVal(q) < 0.1 ? qToVal(q).toFixed(3) : qToVal(q).toFixed(2)} ‰` : "< 0.005 ‰"));
+    }
     showTip(e, box);
   });
   $("globe").addEventListener("pointerleave", hideTip);
@@ -571,7 +610,14 @@ const DATA = /*__DATA__*/null;
   }
   function drawTexts() {
     const f = DATA.forcings[state.forcing], p = DATA.pathways[state.pathway];
-    $("map-title").textContent = `Surface δ¹⁸O anomaly · ${f.label}`;
+    $("map-title").textContent = isDiff()
+      ? `Difference · ${DATA.forcings[DF.a].label} − ${DATA.forcings[DF.b].label}`
+      : `Surface δ¹⁸O anomaly · ${f.label}`;
+    $("view-diff").textContent = `Difference ${DATA.forcings[DF.a].label} − ${DATA.forcings[DF.b].label}`;
+    $("map-note").textContent = (isDiff()
+      ? `Colour: surface anomaly under ${DATA.forcings[DF.a].label} minus under ${DATA.forcings[DF.b].label}, same pathway, on a symmetric log scale. Blue: ${DATA.forcings[DF.a].label} is fresher there; brown: ${DATA.forcings[DF.b].label} is. Differences below 0.005 ‰ take the neutral middle colour. The Forcing buttons still set the chart.`
+      : "Colour: size of the negative (freshening) surface δ¹⁸O anomaly on a log scale, the same for every forcing and pathway. Below 0.005 ‰ shows as open ocean.")
+      + " Outlines: the HadCM3 cells where each region's meltwater enters the ocean. Dots: proxy sites; click one to show it in the chart.";
     const s = SITES.find(x => x.name === state.site);
     $("chart-title").textContent = isQ() ? `Regional discharge · ${f.label}` : `Anomaly at ${state.site}` + (state.sel ? ` · ${byCode[state.sel].name_2026b}` : "");
     $("chart-note").textContent = isQ()
@@ -609,6 +655,7 @@ const DATA = /*__DATA__*/null;
   function syncSegs() {
     document.querySelectorAll("[data-forcing]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.forcing === state.forcing)));
     document.querySelectorAll("[data-pathway]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pathway === state.pathway)));
+    document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === state.view)));
   }
   makeSeg("forcing-seg", FORCINGS, k => DATA.forcings[k].label, "forcing");
   makeSeg("pathway-seg", PATHWAYS, k => ({ cold: "Cold", zonal: "Zonal", mixed: "Mixed" })[k] || k, "pathway");
@@ -627,7 +674,8 @@ const DATA = /*__DATA__*/null;
     drawField(); moveCursor(); drawReadout(); drawModechip(); if (state.table) drawTable();
   }
   function renderChartSide() { drawTexts(); drawLegend(); drawChart(); drawReadout(); drawTable(); }
-  function onSourceChange() { refreshField(); renderChartSide(); drawModechip(); }
+  function onSourceChange() { refreshField(); drawLegendBar(); renderChartSide(); drawModechip(); }
+  document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => { state.view = b.dataset.view; syncSegs(); onSourceChange(); }));
   function renderAll() { buildLut(); drawLegendBar(); sizeCanvas(); drawOverlay(); refreshField(); renderChartSide(); drawModechip(); drawBanner(); drawFooter(); }
 
   slider.addEventListener("input", e => setAge(-Number(e.target.value)));
@@ -669,9 +717,10 @@ const DATA = /*__DATA__*/null;
 
   function start(saved) {
     const s = saved || {};
-    ["forcing", "pathway", "site", "age", "sel", "table", "speed", "howto"].forEach(k => { if (s[k] !== undefined) state[k] = s[k]; });
+    ["forcing", "pathway", "site", "age", "sel", "table", "speed", "howto", "view"].forEach(k => { if (s[k] !== undefined) state[k] = s[k]; });
     if (!FORCINGS.includes(state.forcing)) state.forcing = FORCINGS[0];
     if (!PATHWAYS.includes(state.pathway)) state.pathway = PATHWAYS[0];
+    if (state.view !== "diff") state.view = "anomaly";
     if (state.site !== DISCHARGE && !SITES.some(x => x.name === state.site)) state.site = SITES[0].name;
     state.playing = false; state.age = clampAge(state.age);
     syncSegs(); siteSel.value = state.site; $("speed").value = String(state.speed); slider.value = -state.age;

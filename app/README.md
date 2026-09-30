@@ -66,9 +66,16 @@ gzip + base64 text, because artifacts do not serve raw binary. The build prints 
 
 ## Notes
 
-- **Map colours.** They show the size of the negative (freshening) anomaly,
-  on one logarithmic scale for all forcings and pathways, from 0.005 ‰ to the
-  largest value. Positive values reach at most about 0.01 ‰ and show as zero.
+- **Map colours.** Two maps from Crameri (2018), the same family as the
+  notebook figures:
+  - *Surface anomaly* view: `hawaii`, from pale cyan to purple. It shows the
+    size of the negative (freshening) anomaly on one logarithmic scale for all
+    forcings and pathways, from 0.005 ‰ to the largest value. Positive values
+    reach at most about 0.01 ‰ and show as zero.
+  - *Difference* view: `vik` for GLAC-1D minus ICE-6G, same pathway, on a
+    symmetric log scale. Blue means GLAC-1D is fresher there.
+  - The stops are the `--cm-*` and `--dv-*` tokens in `template.html`.
+  - Region outlines have a dark casing so they stay visible on the field.
 - **Chart sampling.** Site series are decadal in the pipeline. The chart keeps
   every second step (20 yr) between 24 and 8 ka, to keep the page small.
 - **Colours.** Region colours follow the paper figures, adjusted in lightness
