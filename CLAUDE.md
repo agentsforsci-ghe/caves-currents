@@ -17,7 +17,14 @@ is Laura Endres.
 
 - `data/`: SISAL-format database excerpt (schema in `data/schema.dbml`), the two regional discharge series, and `meltmodel_site_weights.csv` (with provenance in `meltmodel_site_weights.md`).
 - `*.qmd` and `*.docx` at the root: one manuscript per question. The DOCX is committed alongside its source.
-- `app/`: Meltwater Discharge Explorer, an interactive map and time series of the discharge. See `app/README.md`.
+- `app/`: Meltwater Discharge Explorer, an interactive map and time series of the discharge. See `app/README.md`. `regions_hadcm3.geojson` holds the exact HadCM3 input regions (made by `scripts/make_region_geojson.py`).
+- **Convolution pipeline (v2)**, laid out like the meltmodel repo:
+  - `myconfig/`: dyes and colours, sites, forcings, pathways and paths.
+  - `mymodules/`: the forcing loader, site extraction, kernels and the convolution.
+  - `scripts/`: `export_pulse_kernels.py` (runs on the Leeds server), `make_uptake_weights.py`, `make_region_geojson.py` and `run_convolution.py`.
+  - Outputs go to `outputs/convolution/`.
+  - New forcings are one entry in `myconfig/FORCINGS.py`, and new sites one entry in `myconfig/SITES.py`.
+- `data/kernels/`: the HadCM3 pulse-kernel bundle. It is **untracked** (see its README for how to make it). `data/meltmodel/uptake_weights.nc` holds the land-site moisture-uptake fields regridded from the trajectories.
 - `plans/`: plans written before large tasks, dated.
 - `prompts/`: verbatim prompt archive written by the commit skill (`YYYY-MM-DD-NNN-slug.md`).
 - `Impulse_Response_Revisions_v1.pdf`: unpublished forward-model draft (Endres et al., in prep.). It is deliberately **untracked**, so never commit it. The same goes for Word lock files (`~$*.docx`).
@@ -38,6 +45,16 @@ After a render, read the text back to check every inline value and claim:
 pandoc nisa_meltwater_sources.docx -t plain --wrap=none
 ```
 
+Convolution pipeline (needs the conda `base` Python with xarray and scipy; about 30 s):
+
+```sh
+python3 scripts/make_uptake_weights.py      # once: trajectories -> data/meltmodel/uptake_weights.nc
+python3 scripts/make_region_geojson.py      # once: HadCM3 input cells -> app/regions_hadcm3.geojson
+python3 scripts/run_convolution.py          # uses data/kernels/ if present, else the placeholder
+```
+
+Without the kernel bundle, `run_convolution.py` falls back to a **placeholder**: the equilibrium field spread over time with an invented 100-yr response time. Its outputs go to `outputs/convolution/placeholder/`, which is gitignored. Never report, commit or publish them as results.
+
 R 4.6 is installed with readr, dplyr, tidyr, purrr, ggplot2, patchwork, strucchange, Bchron, zoo, boot and knitr. **Not** installed: changepoint, flextable and kableExtra. Tables use `knitr::kable()`. The app build uses only the Python standard library.
 
 ## Data conventions
@@ -46,7 +63,12 @@ R 4.6 is installed with readr, dplyr, tidyr, purrr, ggplot2, patchwork, struccha
 - **Discharge files.** Time runs forward in model years: negate `time` (GLAC-1D, 100-yr steps) or `t_adj` (ICE-6G, 500-yr steps) to get yr BP. As a sanity check, total discharge peaks at Meltwater Pulse 1A: 0.260 Sv at 14.4 ka and 0.243 Sv at 14.0 ka.
 - **Region codes** in file order are `Med, Bri, Fen, EurArc, AmeArc, GIS, NLau, SLau, GulofMex`. They map one to one onto Endres et al. (2026b) names: `EIS_MedSea, EIS_BayOfBiscay, EIS_NorwegianSea, EIS_Arctic, LAU_Arctic, GIS_GreenlandSea, LAU_LabradorSea, LAU_StLawrence, LAU_GulfOfMexico`. `LAU_Arctic` drains to the Beaufort Sea.
 - **Anomaly columns** (`<code> d18O (-30/-35/-40)`) hold the *source-region* δ¹⁸O anomaly, which is linear in discharge. They are the forcing that the forward-model draft convolves, not the anomaly at NISA. Use the −35 ‰ end-member; the others only rescale everything by 6/7 or 8/7. Endres et al. (2026b) use a saturating mixing fraction instead, so their scenario values are smaller for large pulses.
-- **Site anomalies.** Multiply source anomalies by `meltmodel_site_weights.csv` (site × region × AMOC mode, cold or zonal). This is an *equilibrium* approximation: it has no transit delay and overstates short pulses, so always say so. The real impulse-response kernels and the convolved NISA series are not available.
+- **Site anomalies (v1).** Multiply source anomalies by `meltmodel_site_weights.csv` (site × region × AMOC mode, cold or zonal). This is an *equilibrium* approximation: it has no transit delay and overstates short pulses, so always say so.
+- **Site anomalies (v2).** Convolve the decadal forcing with the pulse kernels: `A(t) = Σ_k 10·F(t−k)·h(k)`, as in the 2025.05 notebook (`old script/`).
+  - The pulse runs are xpran (cold), xprao (zonal) and xpujc (merid). Each starts after its 10-yr pulse, so the export prepends the parent run's first 10 yr (xpraj, xprak, xpral). The merid parent still needs confirming.
+  - The mixed pathway switches modes on the notebook's schedule. Its first and last modes extend to the ends of the forcing, which gives a spin-up.
+  - Land sites use the trajectory uptake fields. The merid segment borrows the zonal uptake, because there is no merid trajectory run.
+  - `scaling_check.csv` compares the 500-yr step response with the equilibrium weights, and should be about 1.
 - **Published abrupt Glas events** (Endres et al. 2026a, Table 1) are hard-coded in both `nisa_meltwater_sources.qmd` and `app/build_app.py`. Define events by sample **depth**, so that they are re-dated in every age-model ensemble member.
 
 ## Analysis standards (question 2)

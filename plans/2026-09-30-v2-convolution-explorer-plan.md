@@ -53,7 +53,7 @@ mymodules/ forcing.py    load any registered forcing → 10-yr grid, yr BP, 9 re
 scripts/   make_region_geojson.py   HadCM3 input cells (dye_regions_norm.nc) → merged polygons
            make_uptake_weights.py   land_uptakemasks.pkl → data/meltmodel/uptake_weights.nc
            run_convolution.py       CLI: --forcing all|NAME --frame-step 10
-R/         site_metrics.R           five metrics + spider plot, sourced by any .qmd
+R/         site_metrics.R           five metrics + spider plot, sourced by any .qmd (written in step 4)
 ```
 
 **Forcings.** Adding a forcing means one entry in `FORCINGS.py`. As a fallback, any CSV with a `time_bp` column plus the 9 region-code columns also works. GLAC-1D and ICE-6G are configured as the current files (negate `time` or `t_adj`, `<code> d18O (-35.0)`).

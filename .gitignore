@@ -4,3 +4,8 @@
 # Pulse-kernel bundle exported on the Leeds server (large; see data/kernels/README.md)
 data/kernels/*
 !data/kernels/README.md
+
+# Convolution outputs: surface fields are large; placeholder runs must never be committed
+outputs/convolution/fields/
+outputs/convolution/placeholder/
+__pycache__/
