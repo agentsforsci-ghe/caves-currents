@@ -9,3 +9,6 @@ data/kernels/*
 outputs/convolution/fields/
 outputs/convolution/placeholder/
 __pycache__/
+
+# Generated app frames (large; rebuilt by scripts/export_app_frames.py)
+app/frames/

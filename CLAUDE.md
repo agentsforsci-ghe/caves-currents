@@ -51,6 +51,7 @@ Convolution pipeline (needs the conda `base` Python with xarray and scipy; about
 python3 scripts/make_uptake_weights.py      # once: trajectories -> data/meltmodel/uptake_weights.nc
 python3 scripts/make_region_geojson.py      # once: HadCM3 input cells -> app/regions_hadcm3.geojson
 python3 scripts/run_convolution.py          # uses data/kernels/ if present, else the placeholder
+python3 scripts/export_app_frames.py        # decadal fields -> app/frames/ (8-bit, about 5 MB per forcing x pathway)
 ```
 
 Without the kernel bundle, `run_convolution.py` falls back to a **placeholder**: the equilibrium field spread over time with an invented 100-yr response time. Its outputs go to `outputs/convolution/placeholder/`, which is gitignored. Never report, commit or publish them as results.
@@ -111,6 +112,8 @@ Stacked charts use this bottom-to-top order, which keeps neighbouring colours di
 ## Explorer app
 
 - `discharge_explorer.html` is generated, so edit `template.html` or `build_app.py` and rebuild.
+- **v2** reads the pipeline outputs. The map frames are fetched from `app/frames/`, so test over http, not `file://`. `build_app.py --publish-out` refuses placeholder outputs, and a page built from them must not be committed. Publish the six `frames/*.bin` as artifact `files`.
+- In the Chrome automation tab, `requestAnimationFrame` does not run, because the tab reports itself as hidden. To test playback there, replace it with a `setTimeout` stand-in.
 - `regions_approx.geojson` holds hand-digitised, approximate outlines from Endres et al. (2026b, Fig. 2a). Exact HadCM3 masks with the same `code` property can replace it without code changes.
 - The shared page is https://claude.ai/artifact/HMQMC2ACsbpvvDQNyRgcPG, which is private until shared. Republish the `--publish-out` copy to the same URL to keep the link.
 - The browser tools cannot open `file://`. To test locally, serve the folder with `python3 -m http.server 8765 --bind 127.0.0.1` from `app/` and stop the server afterwards.

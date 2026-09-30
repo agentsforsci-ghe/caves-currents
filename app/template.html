@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: control strip on top; map (left) beside the time-series stack (right), stacking to one column on phones. */
+/* Layout: control strip on top; globe with the spreading anomaly (left) beside the site time series (right), one column on phones. */
 :root {
   --bg: #f3f6f8;          /* sea-ice grey, slight blue bias */
   --panel: #fbfcfd;
@@ -17,11 +17,12 @@
   --grat: #d9e2ea;
   --accent: #1c5cab;      /* chart-ink blue */
   --focus: #eb6834;
-  --fresh: #2a78d6;
-  --resal: #eb6834;
+  --warn-bg: #fff1d6; --warn-fg: #6b4300; --warn-edge: #e3b35c;
+  /* AMOC mode strip: neutral steps, labelled, so they never compete with the region hues */
+  --m-cold: #c9d3db; --m-zonal: #e7ecf0; --m-merid: #aebbc6;
   /* region colours: paper figures (tab10), tuned to pass the CVD checks */
   --r-Med: #1f77b4; --r-Bri: #f1780b; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #9b4c3c; --r-NLau: #de72bd; --r-SLau: #a5a608; --r-GulofMex: #00b3c3;
-  /* sequential ramp, near-zero first */
+  /* sequential ramp for freshening magnitude, near-zero first */
   --s1: #e3eefb; --s2: #9ec5f4; --s3: #5598e7; --s4: #256abf; --s5: #0d366b;
   --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -31,7 +32,9 @@
   :root:not([data-theme="light"]) {
     --bg: #0f151a; --panel: #131a20; --fg: #e8eef2; --fg-2: #aab8c2; --fg-3: #7d8c97;
     --rule: #26313a; --land: #28313a; --land-edge: #3c4853; --ocean: #151e25; --grat: #1f2a33;
-    --accent: #86b6ef; --focus: #f08a5d; --fresh: #3987e5; --resal: #d95926;
+    --accent: #86b6ef; --focus: #f08a5d;
+    --warn-bg: #3a2a0c; --warn-fg: #f5d9a3; --warn-edge: #8a6420;
+    --m-cold: #2b3640; --m-zonal: #1c252d; --m-merid: #3a4855;
     --r-Med: #1f77b4; --r-Bri: #db6b00; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #a15142; --r-NLau: #cd63ad; --r-SLau: #959600; --r-GulofMex: #03a2b1;
     --s1: #1a2835; --s2: #184f95; --s3: #2a78d6; --s4: #6da7ec; --s5: #cde2fb;
     color-scheme: dark;
@@ -40,59 +43,60 @@
 :root[data-theme="dark"] {
   --bg: #0f151a; --panel: #131a20; --fg: #e8eef2; --fg-2: #aab8c2; --fg-3: #7d8c97;
   --rule: #26313a; --land: #28313a; --land-edge: #3c4853; --ocean: #151e25; --grat: #1f2a33;
-  --accent: #86b6ef; --focus: #f08a5d; --fresh: #3987e5; --resal: #d95926;
+  --accent: #86b6ef; --focus: #f08a5d;
+  --warn-bg: #3a2a0c; --warn-fg: #f5d9a3; --warn-edge: #8a6420;
+  --m-cold: #2b3640; --m-zonal: #1c252d; --m-merid: #3a4855;
   --r-Med: #1f77b4; --r-Bri: #db6b00; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #a15142; --r-NLau: #cd63ad; --r-SLau: #959600; --r-GulofMex: #03a2b1;
   --s1: #1a2835; --s2: #184f95; --s3: #2a78d6; --s4: #6da7ec; --s5: #cde2fb;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font-body); }
-.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 32px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.wrap { max-width: 1360px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 32px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .wrap > * { min-width: 0; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
 h1 { font: 600 28px/1.1 var(--font-display); letter-spacing: 0.01em; margin: 0; text-wrap: balance; }
-.sub { color: var(--fg-2); margin: 0; max-width: 70ch; }
+.sub { color: var(--fg-2); margin: 0; max-width: 72ch; }
 .eyebrow { font: 500 11px/1 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); }
+.banner { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-edge); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+.banner b { font-weight: 600; }
 .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; }
-.group { display: flex; align-items: center; gap: 8px; }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
 .seg button { font: 500 13px var(--font-body); border: 0; background: transparent; color: var(--fg-2); padding: 5px 10px; cursor: pointer; }
 .seg button + button { border-left: 1px solid var(--rule); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
-select, .btn { font: 500 13px var(--font-body); color: var(--fg); background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; padding: 4px 8px; cursor: pointer; }
+select, .btn { font: 500 13px var(--font-body); color: var(--fg); background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; padding: 4px 8px; cursor: pointer; max-width: 100%; }
 .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
-select:disabled { opacity: 0.45; cursor: default; }
 button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.time { flex: 1 1 320px; display: flex; align-items: center; gap: 8px; min-width: 0; }
-.time input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
-.age { font: 600 22px/1 var(--font-display); font-variant-numeric: tabular-nums; min-width: 6.2ch; text-align: right; }
+.time { flex: 1 1 360px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.time input[type=range] { flex: 1 1 160px; min-width: 120px; accent-color: var(--accent); }
+.age { font: 600 22px/1 var(--font-display); font-variant-numeric: tabular-nums; min-width: 6.4ch; text-align: right; }
 .age small { font: 500 12px var(--font-body); color: var(--fg-3); }
 .main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; align-items: start; }
 @media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
 .card { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; min-width: 0; display: grid; gap: 8px; }
-.maps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.maps.compare { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 560px) { .maps.compare { grid-template-columns: minmax(0, 1fr); } }
-.mapbox { position: relative; min-width: 0; }
-.mapbox h3 { margin: 0 0 2px; font: 600 15px var(--font-display); letter-spacing: 0.02em; color: var(--fg-2); }
+.globe { position: relative; width: 100%; aspect-ratio: 600 / 560; max-width: 100%; }
+.globe canvas, .globe svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.globe .status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; padding: 8px 12px; font-size: 13px; color: var(--fg-2); max-width: 80%; text-align: center; }
 svg { display: block; width: 100%; height: auto; }
-.region { stroke: var(--fg); stroke-width: 1.8; cursor: pointer; }
-.region.sel { stroke: var(--fg); stroke-width: 3; }
-.region:focus { outline: none; }
-.region:focus-visible { stroke: var(--fg) !important; stroke-width: 3; }
-.rlabel { font: 500 11px var(--font-data); fill: var(--fg); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
-.rlabel .code { font-weight: 600; }
-.site { fill: var(--focus); stroke: var(--panel); stroke-width: 1.2; }
-.site.ps { fill: var(--accent); }
-.slabel { font: 500 10.5px var(--font-body); fill: var(--fg-2); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
-.legend-bar { display: flex; align-items: center; gap: 8px; font: 12px var(--font-data); color: var(--fg-2); font-variant-numeric: tabular-nums; }
-.legend-bar .bar { flex: 1; height: 10px; border-radius: 2px; border: 1px solid var(--rule); }
+.region { fill: none; stroke-width: 1.7; pointer-events: visibleStroke; cursor: default; }
+.region.sel { stroke-width: 3; }
+.site { stroke: var(--panel); stroke-width: 1.4; fill: var(--fg-2); cursor: pointer; }
+.site.on { fill: var(--focus); }
+.slabel { font: 500 10.5px var(--font-body); fill: var(--fg); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
+.maphead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.maphead h2, .chart-head h2 { margin: 0; font: 600 17px var(--font-display); letter-spacing: 0.02em; }
+.modechip { font: 500 12px var(--font-body); color: var(--fg-2); border: 1px solid var(--rule); border-radius: 999px; padding: 1px 9px; }
+.legend-bar { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font: 12px var(--font-data); color: var(--fg-2); font-variant-numeric: tabular-nums; }
+.legend-bar .bar { height: 10px; border-radius: 2px; border: 1px solid var(--rule); }
+.legend-bar .ticks { grid-column: 2; position: relative; height: 14px; }
+.legend-bar .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .note { font-size: 12px; color: var(--fg-3); margin: 0; }
 .readout { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; }
 .readout .v { font: 600 24px/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .readout .l { font-size: 12px; color: var(--fg-3); }
-.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
-.chart-head h2 { margin: 0; font: 600 17px var(--font-display); letter-spacing: 0.02em; }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 6px; }
 .legend button { display: inline-flex; align-items: center; gap: 6px; font: 12px var(--font-body); color: var(--fg-2); background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
 .legend button:hover { border-color: var(--rule); }
@@ -103,88 +107,86 @@ svg { display: block; width: 100%; height: auto; }
 .grid line { stroke: var(--grat); }
 .cursor { stroke: var(--focus); stroke-width: 1.5; }
 .hair { stroke: var(--fg-3); stroke-width: 1; stroke-dasharray: 3 3; }
-.evband { opacity: 0.18; }
-.evlabel { font: 10px var(--font-data); fill: var(--fg-2); }
-.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--panel); color: var(--fg); border: 1px solid var(--rule); border-radius: 5px; padding: 7px 9px; font-size: 12px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); max-width: 280px; }
+.lab { font: 10.5px var(--font-data); fill: var(--fg-2); }
+.modelab { font: 500 10.5px var(--font-body); fill: var(--fg-2); }
+.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--panel); color: var(--fg); border: 1px solid var(--rule); border-radius: 5px; padding: 7px 9px; font-size: 12px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); max-width: 300px; }
 .tip .t { font: 600 13px var(--font-display); margin-bottom: 3px; }
 .tip .row { display: grid; grid-template-columns: 14px auto 1fr; gap: 6px; align-items: center; }
 .tip .row b { font: 600 12px var(--font-data); font-variant-numeric: tabular-nums; text-align: right; }
 .tip .row span { color: var(--fg-2); }
-.tip .key { width: 12px; height: 2px; }
+.tip .key { width: 12px; height: 3px; }
 .tablewrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
+caption { text-align: left; }
 th, td { padding: 5px 8px; border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
 th { font: 500 11px var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3); }
 td.num { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
-footer { color: var(--fg-3); font-size: 12px; display: grid; gap: 4px; max-width: 110ch; }
+footer { color: var(--fg-3); font-size: 12px; display: grid; gap: 4px; max-width: 115ch; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 <!--HEAD-END-->
 <div class="wrap">
   <header>
     <div>
-      <div class="eyebrow">NISA · deglacial meltwater forcing</div>
+      <div class="eyebrow">NISA · deglacial meltwater · HadCM3 impulse responses</div>
       <h1>Meltwater Discharge Explorer</h1>
     </div>
-    <p class="sub">River-routed discharge from the GLAC-1D and ICE-6G ice-sheet reconstructions into the nine dye-tracer source regions of the impulse-response forward model. Drag the time slider or click the chart to move through the last deglaciation.</p>
+    <p class="sub">Meltwater from nine ice-sheet drainage regions, carried by the ocean. The globe shows how the surface δ¹⁸O anomaly spreads, decade by decade. The chart shows what reaches one proxy site and where it came from. Pick a reconstruction and an AMOC pathway, then play or drag through the deglaciation.</p>
   </header>
 
+  <div class="banner" id="banner" hidden></div>
+
   <section class="controls" aria-label="Controls">
-    <div class="group"><span class="eyebrow">Reconstruction</span>
-      <div class="seg" role="group" aria-label="Reconstruction">
-        <button id="rc-glac" type="button" data-recon="GLAC-1D" aria-pressed="true">GLAC-1D</button>
-        <button id="rc-ice6" type="button" data-recon="ICE-6G" aria-pressed="false">ICE-6G</button>
-      </div>
-      <button id="compare" class="btn" type="button" aria-pressed="false" title="Show GLAC-1D and ICE-6G maps side by side">Compare</button>
+    <div class="group"><span class="eyebrow">Forcing</span>
+      <div class="seg" role="group" aria-label="Forcing" id="forcing-seg"></div>
     </div>
-    <div class="group"><span class="eyebrow">Show</span>
-      <div class="seg" role="group" aria-label="Quantity">
-        <button id="q-q" type="button" data-qty="Q" aria-pressed="true">Discharge</button>
-        <button id="q-a" type="button" data-qty="A" aria-pressed="false">δ¹⁸O anomaly</button>
-      </div>
-      <label class="eyebrow" for="em">End-member</label>
-      <select id="em" disabled>
-        <option value="-30">−30 ‰</option>
-        <option value="-35" selected>−35 ‰</option>
-        <option value="-40">−40 ‰</option>
-      </select>
+    <div class="group"><span class="eyebrow">AMOC pathway</span>
+      <div class="seg" role="group" aria-label="AMOC pathway" id="pathway-seg"></div>
     </div>
     <div class="time">
       <button id="play" class="btn" type="button" aria-label="Play">Play</button>
-      <button id="back" class="btn" type="button" aria-label="One step older">‹</button>
+      <label class="eyebrow" for="speed">Speed</label>
+      <select id="speed">
+        <option value="100">100 yr/s</option>
+        <option value="250" selected>250 yr/s</option>
+        <option value="500">500 yr/s</option>
+        <option value="1000">1000 yr/s</option>
+      </select>
       <input id="slider" type="range" aria-label="Age in ka BP">
-      <button id="fwd" class="btn" type="button" aria-label="One step younger">›</button>
-      <div class="age" aria-live="polite"><span id="age-val">14.4</span> <small>ka BP</small></div>
+      <div class="age" aria-live="off"><span id="age-val">15.0</span> <small>ka BP</small></div>
     </div>
   </section>
 
   <div class="main">
-    <section class="card" aria-label="Map">
-      <div class="readout" id="readout"></div>
-      <div class="maps" id="maps"></div>
-      <div class="legend-bar"><span id="leg-lo">0</span><div class="bar" id="leg-bar"></div><span id="leg-hi"></span></div>
-      <p class="note">Region outlines are approximate, digitised from Endres et al. (2026b, Fig. 2a) and the forward-model draft (Fig. 5.1); they are not the HadCM3 masks. Fill shows the value at the selected age; outline colours match the chart and the paper figures. Stars: NISA (La Vallina cave) and core PS2644-5. Click a region to follow it in the chart.</p>
+    <section class="card" aria-label="Surface anomaly map">
+      <div class="maphead"><h2 id="map-title">Surface δ¹⁸O anomaly</h2><span class="modechip" id="modechip"></span></div>
+      <div class="globe" id="globe">
+        <canvas id="field" aria-hidden="true"></canvas>
+        <svg id="overlay" viewBox="0 0 600 560" role="img" aria-label="Globe centred on the North Atlantic with the surface anomaly, the nine input regions and the proxy sites"></svg>
+        <div class="status" id="status" hidden></div>
+      </div>
+      <div class="legend-bar"><span>−‰</span><div class="bar" id="leg-bar"></div><div class="ticks" id="leg-ticks"></div></div>
+      <p class="note">Colour: size of the negative (freshening) surface δ¹⁸O anomaly on a log scale, the same for every forcing and pathway. Below 0.005 ‰ shows as open ocean. Outlines: the HadCM3 cells where each region's meltwater enters the ocean. Dots: proxy sites; click one to show it in the chart.</p>
     </section>
 
-    <section class="card" aria-label="Time series">
+    <section class="card" aria-label="Site time series">
       <div class="chart-head">
-        <h2 id="chart-title">Regional discharge</h2>
+        <h2 id="chart-title">Anomaly at the site</h2>
         <div class="group">
-          <button id="glas" class="btn" type="button" aria-pressed="true">Glas δ¹⁸O</button>
+          <label class="eyebrow" for="site">Site</label>
+          <select id="site"></select>
           <button id="tbl" class="btn" type="button" aria-pressed="false">Table</button>
         </div>
       </div>
+      <div class="readout" id="readout"></div>
       <div class="legend" id="legend" aria-label="Regions"></div>
       <div id="chart"></div>
-      <div id="glaspanel"></div>
       <div class="tablewrap" id="tablewrap" hidden></div>
+      <p class="note" id="chart-note"></p>
     </section>
   </div>
 
-  <footer>
-    <div>Data: <code>data/Discharge_Glac1d_regional-withd18O.csv</code> (100-yr steps, 26–0 ka) and <code>data/Discharge_ice6g_regional-withd18O.csv</code> (500-yr steps), the forcing of Endres et al. (in prep.). The δ¹⁸O anomaly is the source-region anomaly, Q · 1 yr · δ¹⁸O<sub>ice</sub> / V<sub>region</sub>, before transport to NISA. In Compare mode ICE-6G shows its nearest 500-yr value.</div>
-    <div>Glas: stalagmite δ¹⁸O from La Vallina cave on the published chronology; shaded bands are the abrupt events of Endres et al. (2026a, Table 1), blue for freshening and orange for re-salinisation. Coastline: Natural Earth 110 m.</div>
-  </footer>
+  <footer id="footer"></footer>
 </div>
 <div class="tip" id="tip" hidden></div>
 
@@ -196,311 +198,456 @@ const DATA = /*__DATA__*/null;
 <script>
 (function () {
   "use strict";
-  const R = DATA.regions;                                  // file order
+  const R = DATA.regions;
+  const CODES = R.map(r => r.code);
   // Stacking order (bottom to top) chosen so that neighbouring colours stay distinct for colour-blind readers.
   const STACK = ["Bri", "NLau", "SLau", "GulofMex", "EurArc", "Med", "Fen", "AmeArc", "GIS"];
   const byCode = Object.fromEntries(R.map(r => [r.code, r]));
-  const state = { recon: "GLAC-1D", qty: "Q", em: "-35", age: 14400, compare: false, sel: null, glas: true, table: false, playing: false };
+  const FORCINGS = Object.keys(DATA.forcings);
+  const PATHWAYS = Object.keys(DATA.pathways);
+  const SITES = DATA.sites;
+  const DISCHARGE = "__discharge__";
+  const FR = DATA.frames, AGES = FR.ages, NCELL = FR.cells.lat.length;
+  const SER = DATA.series, SUNIT = SER.unit;
+  const MODE_LABEL = { cold: "Cold (weak AMOC)", zonal: "Zonal (strong AMOC)", merid: "Meridional" };
+
+  const state = { forcing: FORCINGS[0], pathway: PATHWAYS.includes("mixed") ? "mixed" : PATHWAYS[0],
+    site: "La Vallina (NISA)", age: 15000, sel: null, table: false, playing: false, speed: 250 };
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const colorOf = k => css("--r-" + k);
   const $ = id => document.getElementById(id);
   const noNegZero = t => (/^-0(\.0+)?$/.test(t) ? t.slice(1) : t);
-  const fmtQ = v => noNegZero((v * 1000).toFixed(Math.abs(v * 1000) >= 100 ? 0 : 1));   // Sv -> mSv
-  const fmtA = v => noNegZero(v.toFixed(2));
-  const unit = () => state.qty === "Q" ? "mSv" : "‰";
-  const fmt = v => state.qty === "Q" ? fmtQ(v) : fmtA(v);
+  const fmtA = v => noNegZero((Math.abs(v) < 0.1 ? v.toFixed(3) : v.toFixed(2)).replace("-", "−"));
+  const fmtQ = v => noNegZero((v * 1000).toFixed(Math.abs(v * 1000) >= 100 ? 0 : 1));
+  const ka = a => (a / 1000).toFixed(2);
+  const isQ = () => state.site === DISCHARGE;
 
-  // ---- data access -------------------------------------------------------
-  const rec = r => DATA.recon[r];
-  const series = (r, code) => state.qty === "Q" ? rec(r).Q[code] : rec(r).A[state.em][code];
-  const idxAt = (r, age) => {                                   // nearest index
-    const a = rec(r).ages; let best = 0, d = Infinity;
-    for (let i = 0; i < a.length; i++) { const e = Math.abs(a[i] - age); if (e < d) { d = e; best = i; } }
-    return best;
-  };
-  const valuesAt = (r, age) => { const i = idxAt(r, age); return { i, age: rec(r).ages[i], v: Object.fromEntries(R.map(x => [x.code, series(r, x.code)[i]])) }; };
-  const magMax = () => {                                        // shared across reconstructions
-    let m = 0;
-    for (const r of Object.keys(DATA.recon)) for (const x of R) for (const v of series(r, x.code)) m = Math.max(m, Math.abs(v));
-    return m;
-  };
+  // ---- AMOC mode at an age (same rule as mymodules/convolution.pathway_modes) ----
+  function modeAt(pathway, age) {
+    const s = DATA.pathways[pathway].schedule;
+    if (s.length === 1 && s[0][0] === null) return s[0][2];
+    for (const [older, younger, m] of s) if (age <= older && age > younger) return m;
+    return age > s[0][0] ? s[0][2] : s[s.length - 1][2];
+  }
 
-  // ---- geometry ----------------------------------------------------------
-  const land = topojson.feature(DATA.land, DATA.land.objects.land);
-  const regions = DATA.geo.features.map(f => {
-    const g = JSON.parse(JSON.stringify(f));
-    if (d3.geoArea(g) > 2 * Math.PI) g.geometry.coordinates = g.geometry.coordinates.map(r => r.slice().reverse());
-    return g;
-  });
+  // ---- colour scale for the field --------------------------------------------
+  const SC = FR.scale, SPAN = Math.log(SC.vmax / SC.vmin);
+  const qToVal = q => SC.vmin * Math.exp((q - 1) / 254 * SPAN);
+  const valToQ = v => v < SC.vmin ? 0 : Math.min(255, 1 + Math.round(254 * Math.log(v / SC.vmin) / SPAN));
+  let LUT = [];
+  function buildLut() {
+    const interp = d3.interpolateRgbBasis(["--s1", "--s2", "--s3", "--s4", "--s5"].map(css));
+    LUT = d3.range(256).map(q => q === 0 ? null : interp((q - 1) / 254));
+  }
+  function drawLegendBar() {
+    $("leg-bar").style.background = `linear-gradient(to right, ${d3.range(0, 1.001, 0.1).map(p => d3.interpolateRgbBasis(["--s1", "--s2", "--s3", "--s4", "--s5"].map(css))(p)).join(",")})`;
+    const ticks = [0.01, 0.03, 0.1, 0.3, 1, 3].filter(v => v >= SC.vmin && v <= SC.vmax);
+    const host = $("leg-ticks"); host.replaceChildren();
+    ticks.forEach(v => { const s = document.createElement("span"); s.style.left = (100 * Math.log(v / SC.vmin) / SPAN) + "%"; s.textContent = v; host.appendChild(s); });
+  }
+
+  // ---- globe geometry --------------------------------------------------------
   const W = 600, H = 560;
-  const proj = d3.geoOrthographic().rotate([38, -52]).fitExtent([[8, 8], [W - 8, H - 8]], { type: "Sphere" });
+  const ROT = [38, -52];
+  const proj = d3.geoOrthographic().rotate(ROT).fitExtent([[8, 8], [W - 8, H - 8]], { type: "Sphere" });
   const path = d3.geoPath(proj);
+  const centre = [-ROT[0], -ROT[1]];
+  const land = topojson.feature(DATA.land, DATA.land.objects.land);
   const grat = d3.geoGraticule10();
-  const labelNudge = { GIS: [26, 10], NLau: [-6, 4], Fen: [18, 4], EurArc: [0, -8], AmeArc: [8, 0], Bri: [-24, -4], Med: [12, -22], SLau: [0, 14], GulofMex: [-4, 16] };
+  // Cell quads in viewBox units, padded a little so neighbours meet without seams.
+  const half = FR.cells.d / 2 + 0.04;
+  const quads = new Float32Array(NCELL * 8), visible = new Uint8Array(NCELL);
+  const cellKey = new Map();
+  for (let i = 0; i < NCELL; i++) {
+    const la = FR.cells.lat[i], lo = FR.cells.lon[i];
+    cellKey.set(Math.round(la / FR.cells.d * 2) + "," + Math.round(lo / FR.cells.d * 2), i);
+    if (d3.geoDistance(centre, [lo, la]) > Math.PI / 2 - 0.02) continue;
+    const pts = [[lo - half, la - half], [lo + half, la - half], [lo + half, la + half], [lo - half, la + half]].map(p => proj(p));
+    visible[i] = 1;
+    pts.forEach((p, k) => { quads[i * 8 + 2 * k] = p[0]; quads[i * 8 + 2 * k + 1] = p[1]; });
+  }
+  function cellAt(lon, lat) {
+    const d = FR.cells.d, snap = v => (Math.floor(v / d) + 0.5) * d;
+    return cellKey.get(Math.round(snap(lat) / d * 2) + "," + Math.round(snap(lon) / d * 2));
+  }
 
-  function drawMap(container, recon) {
-    const box = document.createElement("div"); box.className = "mapbox";
-    if (state.compare) { const h = document.createElement("h3"); h.textContent = recon + (recon === "ICE-6G" ? " (nearest 500-yr step)" : ""); box.appendChild(h); }
-    const svg = d3.select(box).append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img")
-      .attr("aria-label", `Map of the nine meltwater source regions, ${recon}`);
-    svg.append("path").attr("d", path({ type: "Sphere" })).attr("fill", css("--ocean")).attr("stroke", css("--rule"));
-    svg.append("path").attr("d", path(grat)).attr("fill", "none").attr("stroke", css("--grat")).attr("stroke-width", 0.6);
+  // ---- frames: fetched per forcing x pathway ----------------------------------
+  const cache = new Map(), pending = new Map();
+  const frameKey = () => `${state.forcing}_${state.pathway}`;
+  function loadFrames(key) {
+    if (cache.has(key)) return Promise.resolve(cache.get(key));
+    if (pending.has(key)) return pending.get(key);
+    const p = fetch(FR.files[key]).then(r => { if (!r.ok) throw new Error(r.status + " " + r.statusText); return r.arrayBuffer(); })
+      .then(b => { const u = new Uint8Array(b); if (u.length !== AGES.length * NCELL) throw new Error("unexpected file size"); cache.set(key, u); pending.delete(key); return u; })
+      .catch(e => { pending.delete(key); throw e; });
+    pending.set(key, p);
+    return p;
+  }
+  const frameIdx = age => Math.max(0, Math.min(AGES.length - 1, Math.round((AGES[0] - age) / (AGES[0] - AGES[1]))));
+
+  // ---- field canvas ------------------------------------------------------------
+  const canvas = $("field"), ctx = canvas.getContext("2d");
+  function sizeCanvas() {
+    const r = canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
+  }
+  function drawField() {
+    const sx = canvas.width / W, sy = canvas.height / H;
+    ctx.setTransform(sx, 0, 0, sy, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.beginPath(); d3.geoPath(proj, ctx)({ type: "Sphere" }); ctx.fillStyle = css("--ocean"); ctx.fill();
+    const u = cache.get(frameKey()); if (!u) return;
+    const off = frameIdx(state.age) * NCELL;
+    const buckets = new Map();
+    for (let i = 0; i < NCELL; i++) {
+      if (!visible[i]) continue;
+      const q = u[off + i]; if (!q) continue;
+      let b = buckets.get(q); if (!b) { b = []; buckets.set(q, b); } b.push(i);
+    }
+    for (const [q, cells] of buckets) {
+      ctx.beginPath();
+      for (const i of cells) {
+        const o = i * 8;
+        ctx.moveTo(quads[o], quads[o + 1]); ctx.lineTo(quads[o + 2], quads[o + 3]); ctx.lineTo(quads[o + 4], quads[o + 5]); ctx.lineTo(quads[o + 6], quads[o + 7]); ctx.closePath();
+      }
+      ctx.fillStyle = LUT[q]; ctx.fill();
+    }
+  }
+  function showStatus(msg) { const s = $("status"); s.textContent = msg || ""; s.hidden = !msg; }
+  function refreshField() {
+    const key = frameKey();
+    if (cache.has(key)) { showStatus(""); drawField(); return; }
+    showStatus("Loading the surface field…");
+    drawField();
+    loadFrames(key).then(() => { if (frameKey() === key) { showStatus(""); drawField(); } })
+      .catch(e => showStatus(location.protocol === "file:"
+        ? "The map frames are separate files and need a web server. From the app folder run: python3 -m http.server 8765"
+        : "Could not load the surface field (" + e.message + ")."));
+  }
+
+  // ---- SVG overlay: land, regions, sites -------------------------------------------
+  const svg = d3.select("#overlay");
+  function drawOverlay() {
+    svg.selectAll("*").remove();
+    svg.append("path").attr("d", path(grat)).attr("fill", "none").attr("stroke", css("--grat")).attr("stroke-width", 0.5).attr("opacity", 0.8);
     svg.append("path").attr("d", path(land)).attr("fill", css("--land")).attr("stroke", css("--land-edge")).attr("stroke-width", 0.5);
-    const { v, age } = valuesAt(recon, state.age);
-    const color = seqScale();
-    const total = d3.sum(Object.values(v));
-    svg.append("g").selectAll("path").data(regions).join("path")
+    svg.append("path").attr("d", path({ type: "Sphere" })).attr("fill", "none").attr("stroke", css("--rule"));
+    svg.append("g").selectAll("path").data(DATA.geo.features).join("path")
       .attr("class", d => "region" + (state.sel === d.properties.code ? " sel" : ""))
-      .attr("d", path).attr("fill", d => color(Math.abs(v[d.properties.code])))
-      .style("stroke", d => state.sel === d.properties.code ? null : colorOf(d.properties.code))
-      .attr("tabindex", 0).attr("role", "button")
-      .attr("aria-label", d => `${d.properties.name_draft}: ${fmt(v[d.properties.code])} ${unit()}`)
-      .on("click", (e, d) => toggleSel(d.properties.code))
-      .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSel(d.properties.code); } })
-      .on("pointermove focus", (e, d) => showTip(e, regionTip(d.properties.code, v, total, recon, age)))
-      .on("pointerleave blur", hideTip);
-    const lab = svg.append("g");
-    regions.forEach(d => {
-      const c = path.centroid(d); if (!isFinite(c[0])) return;
-      const n = labelNudge[d.properties.code] || [0, 0];
-      const t = lab.append("text").attr("class", "rlabel").attr("x", c[0] + n[0]).attr("y", c[1] + n[1]).attr("text-anchor", "middle");
-      t.append("tspan").attr("class", "code").text(byCode[d.properties.code].short + " ");
-      t.append("tspan").text(fmt(v[d.properties.code]));
+      .attr("d", path).style("stroke", d => colorOf(d.properties.code))
+      .on("pointermove", (e, d) => showTip(e, regionTip(d.properties.code)))
+      .on("pointerleave", hideTip);
+    const g = svg.append("g");
+    SITES.forEach(s => {
+      if (d3.geoDistance(centre, [s.lon, s.lat]) > Math.PI / 2) return;
+      const p = proj([s.lon, s.lat]);
+      const sym = d3.symbol(s.domain === "ocean" ? d3.symbolCircle : d3.symbolDiamond, s.domain === "ocean" ? 70 : 90)();
+      g.append("path").attr("class", "site" + (state.site === s.name ? " on" : "")).attr("d", sym).attr("transform", `translate(${p[0]},${p[1]})`)
+        .attr("tabindex", 0).attr("role", "button").attr("aria-label", `${s.name} (${s.type}). Show in chart.`)
+        .on("click", () => setSite(s.name))
+        .on("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSite(s.name); } })
+        .on("pointermove focus", e => showTip(e, siteTip(s)))
+        .on("pointerleave blur", hideTip);
+      if (state.site === s.name) g.append("text").attr("class", "slabel").attr("x", p[0] + 8).attr("y", p[1] - 7).text(s.name);
     });
-    DATA.sites.forEach(s => {
-      const p = proj([s.lon, s.lat]); if (!p) return;
-      const star = d3.symbol(d3.symbolStar, 110)();
-      svg.append("path").attr("class", "site" + (s.name.startsWith("PS") ? " ps" : "")).attr("d", star).attr("transform", `translate(${p[0]},${p[1]})`);
-      svg.append("text").attr("class", "slabel").attr("x", p[0] + 8).attr("y", p[1] - 7).text(s.name.startsWith("PS") ? "PS2644" : "NISA");
-    });
-    container.appendChild(box);
   }
+  // Hover the field: value of the cell under the pointer.
+  $("globe").addEventListener("pointermove", e => {
+    if (e.target.closest(".region, .site")) return;
+    const r = $("overlay").getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+    const ll = proj.invert([x, y]);
+    if (!ll || d3.geoDistance(centre, ll) > Math.PI / 2) { hideTip(); return; }
+    const i = cellAt(ll[0], ll[1]); const u = cache.get(frameKey());
+    if (i === undefined || !u) { hideTip(); return; }
+    const q = u[frameIdx(state.age) * NCELL + i];
+    const box = el("div");
+    box.append(el("div", "t", `${Math.abs(ll[1]).toFixed(1)}°${ll[1] >= 0 ? "N" : "S"}, ${Math.abs(ll[0]).toFixed(1)}°${ll[0] >= 0 ? "E" : "W"} · ${ka(AGES[frameIdx(state.age)])} ka`));
+    box.append(row(null, "Surface δ¹⁸O anomaly", q ? `≈ −${qToVal(q) < 0.1 ? qToVal(q).toFixed(3) : qToVal(q).toFixed(2)} ‰` : "< 0.005 ‰"));
+    showTip(e, box);
+  });
+  $("globe").addEventListener("pointerleave", hideTip);
 
-  function seqScale() {
-    const stops = ["--s1", "--s2", "--s3", "--s4", "--s5"].map(css);
-    return d3.scaleSequentialSqrt(d3.interpolateRgbBasis(stops)).domain([0, magMax()]);
-  }
-
-  function regionTip(code, v, total, recon, age) {
-    const r = byCode[code];
-    const box = document.createElement("div");
-    const t = document.createElement("div"); t.className = "t"; t.textContent = `${r.name_draft} · ${recon}, ${(age / 1000).toFixed(1)} ka`; box.appendChild(t);
-    const add = (label, value) => { const row = document.createElement("div"); row.className = "row"; row.append(document.createElement("i"));
-      const s = document.createElement("span"); s.textContent = label; const b = document.createElement("b"); b.textContent = value; row.append(s, b); box.appendChild(row); };
-    add(state.qty === "Q" ? "Discharge" : "δ¹⁸O anomaly", `${fmt(v[code])} ${unit()}`);
-    add("Share of total", total ? `${(100 * v[code] / total).toFixed(1)} %` : "–");
-    add("Region (2026b)", r.name_2026b);
-    add("Ice sheet", r.ice_sheet);
-    return box;
-  }
-
-  // ---- tooltip -------------------------------------------------------------
+  // ---- tooltip helpers -------------------------------------------------------------
   const tip = $("tip");
+  function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+  function row(color, label, value) {
+    const r = el("div", "row"); const k = el("i", color ? "key" : ""); if (color) k.style.background = color;
+    r.append(k, el("span", "", label), el("b", "", value)); return r;
+  }
   function showTip(e, node) {
     tip.replaceChildren(node); tip.hidden = false;
-    let x = (e.clientX ?? 0), y = (e.clientY ?? 0);
+    let x = e.clientX ?? 0, y = e.clientY ?? 0;
     if (!e.clientX && e.target && e.target.getBoundingClientRect) { const b = e.target.getBoundingClientRect(); x = b.right; y = b.top; }
-    const tw = tip.offsetWidth, th = tip.offsetHeight;
-    tip.style.left = Math.min(x + 14, window.innerWidth - tw - 8) + "px";
-    tip.style.top = Math.max(8, Math.min(y + 14, window.innerHeight - th - 8)) + "px";
+    tip.style.left = Math.min(x + 14, window.innerWidth - tip.offsetWidth - 8) + "px";
+    tip.style.top = Math.max(8, Math.min(y + 14, window.innerHeight - tip.offsetHeight - 8)) + "px";
   }
   function hideTip() { tip.hidden = true; }
-
-  // ---- time-series chart ---------------------------------------------------
-  function stackRows(recon) {
-    const a = rec(recon).ages;
-    return a.map((age, i) => {
-      const row = { age };
-      STACK.forEach(k => { row[k] = series(recon, k)[i]; });
-      return row;
-    });
+  function regionTip(code) {
+    const r = byCode[code], b = el("div");
+    b.append(el("div", "t", `${r.short} · ${r.name_2026b}`), row(colorOf(code), "Ice sheet", r.ice_sheet));
+    const d = el("div", "", r.drainage); d.style.color = "var(--fg-2)"; d.style.marginTop = "3px"; b.append(d);
+    return b;
   }
-  let xScale = null;
+  function siteTip(s) {
+    const b = el("div"); b.append(el("div", "t", s.name), row(null, "Type", s.type),
+      row(null, "Position", `${Math.abs(s.lat).toFixed(2)}°N, ${Math.abs(s.lon).toFixed(2)}°W`),
+      row(null, "Extraction", s.domain === "ocean" ? "ocean box ±2°" : "moisture-uptake weighted"));
+    return b;
+  }
+
+  // ---- series access ---------------------------------------------------------------
+  const serAges = d3.range(SER.window[0], SER.window[1] - 1, -SER.step);
+  const serNode = (pw) => SER.data[state.forcing][pw || state.pathway][state.site];
+  const serIdx = age => Math.max(0, Math.min(serAges.length - 1, Math.round((SER.window[0] - age) / SER.step)));
+  function valuesAt(age) {
+    if (isQ()) {
+      const f = DATA.forcings[state.forcing]; let best = 0, dd = Infinity;
+      f.ages.forEach((a, i) => { const e = Math.abs(a - age); if (e < dd) { dd = e; best = i; } });
+      return { age: f.ages[best], v: Object.fromEntries(CODES.map(c => [c, f.Q[c][best]])) };
+    }
+    const i = serIdx(age), n = serNode();
+    return { age: serAges[i], v: Object.fromEntries(CODES.map(c => [c, n[c][i] * SUNIT])), total: n.total[i] * SUNIT };
+  }
+  const fmtV = v => isQ() ? fmtQ(v) : fmtA(v);
+  const unit = () => isQ() ? "mSv" : "‰";
+
+  // ---- chart ---------------------------------------------------------------------
+  let chart = null;   // {x, cursor, h, m}
   function drawChart() {
     const host = $("chart"); host.replaceChildren();
-    const w = Math.max(300, host.clientWidth || 600), h = 284, m = { t: 8, r: 12, b: 40, l: 54 };
-    const recon = state.recon, rows = stackRows(recon), ages = rec(recon).ages;
-    const x = d3.scaleLinear().domain([d3.max(ages), Math.max(0, d3.min(ages))]).range([m.l, w - m.r]); xScale = x;
-    const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${w} ${h}`).attr("role", "img")
-      .attr("aria-label", `${state.qty === "Q" ? "Discharge" : "δ18O anomaly"} by region through time, ${recon}`);
-    let y;
+    const w = Math.max(300, host.clientWidth || 640), h = 300, m = { t: 10, r: 58, b: 60, l: 54 };
+    const svgc = d3.select(host).append("svg").attr("viewBox", `0 0 ${w} ${h}`).attr("role", "img");
+    const x = d3.scaleLinear().domain([SER.window[0], SER.window[1]]).range([m.l, w - m.r]);
+    const plotB = h - m.b;
+    let y, rows, ages;
+    if (isQ()) {
+      const f = DATA.forcings[state.forcing];
+      ages = f.ages.map(a => a).filter(a => a <= SER.window[0] + f.step && a >= SER.window[1] - f.step);
+      const idx = ages.map(a => f.ages.indexOf(a));
+      rows = idx.map((i, k) => Object.assign({ age: ages[k] }, Object.fromEntries(STACK.map(c => [c, f.Q[c][i]]))));
+      svgc.attr("aria-label", `Regional meltwater discharge, ${f.label}`);
+    } else {
+      const n = serNode(); ages = serAges;
+      rows = ages.map((a, i) => Object.assign({ age: a }, Object.fromEntries(STACK.map(c => [c, n[c][i] * SUNIT]))));
+      svgc.attr("aria-label", `δ18O anomaly at ${state.site} by source region, ${DATA.forcings[state.forcing].label}, ${DATA.pathways[state.pathway].label}`);
+    }
+    const curve = isQ() ? d3.curveStepAfter : d3.curveLinear;
     if (state.sel) {
-      const s = series(recon, state.sel);
-      y = d3.scaleLinear().domain(d3.extent([0, ...s])).nice().range([h - m.b, m.t]);
-      svg.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(-(w - m.l - m.r)).tickFormat("")).call(g => g.select(".domain").remove());
-      const col = colorOf(state.sel);
-      svg.append("path").datum(ages.map((a, i) => [a, s[i]])).attr("fill", "none").attr("stroke", col).attr("stroke-width", 2)
-        .attr("d", d3.line().x(d => x(d[0])).y(d => y(d[1])).curve(d3.curveStepAfter));
+      const s = rows.map(r => r[state.sel]);
+      y = d3.scaleLinear().domain(d3.extent([0, ...s])).nice().range([plotB, m.t]);
     } else {
       const st = d3.stack().keys(STACK).offset(d3.stackOffsetDiverging)(rows);
-      y = d3.scaleLinear().domain(d3.extent(st.flat(2))).nice().range([h - m.b, m.t]);
-      svg.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(-(w - m.l - m.r)).tickFormat("")).call(g => g.select(".domain").remove());
-      svg.append("g").selectAll("path").data(st).join("path").attr("fill", d => colorOf(d.key)).attr("stroke", d => colorOf(d.key)).attr("stroke-width", 0.4)
-        .attr("d", d3.area().x(d => x(d.data.age)).y0(d => y(d[0])).y1(d => y(d[1])).curve(d3.curveStepAfter));
+      let ext = d3.extent(st.flat(2));
+      if (!isQ()) PATHWAYS.forEach(pw => { const t = serNode(pw).total; ext = d3.extent([...ext, ...d3.extent(t).map(v => v * SUNIT)]); });
+      y = d3.scaleLinear().domain(ext).nice().range([plotB, m.t]);
+      rows._st = st;
     }
-    const tf = state.qty === "Q" ? (d => (d * 1000).toFixed(0)) : (d => d.toFixed(1));
-    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).ticks(Math.min(13, w / 55)).tickFormat(d => d / 1000));
-    svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(tf));
-    svg.append("text").attr("class", "evlabel").attr("x", w - m.r).attr("y", h - 2).attr("text-anchor", "end").text("Age (ka BP)");
-    svg.append("text").attr("class", "evlabel").attr("transform", `translate(10,${(m.t + h - m.b) / 2}) rotate(-90)`).attr("text-anchor", "middle").text(unit());
-    svg.append("line").attr("class", "cursor").attr("x1", x(state.age)).attr("x2", x(state.age)).attr("y1", m.t).attr("y2", h - m.b);
-    const hair = svg.append("line").attr("class", "hair").attr("y1", m.t).attr("y2", h - m.b).style("display", "none");
-    svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", w - m.l - m.r).attr("height", h - m.t - m.b).attr("fill", "transparent")
-      .style("cursor", "crosshair")
-      .on("pointermove", e => {
-        const [px] = d3.pointer(e); const age = x.invert(px); const { v, age: a } = valuesAt(recon, age);
-        hair.style("display", null).attr("x1", x(a)).attr("x2", x(a));
-        showTip(e, seriesTip(recon, a, v));
-      })
+    // AMOC mode strip below the plot (anomaly views only)
+    if (!isQ()) {
+      const s = DATA.pathways[state.pathway].schedule, segs = [];
+      if (s.length === 1 && s[0][0] === null) segs.push([SER.window[0], SER.window[1], s[0][2]]);
+      else {
+        segs.push([SER.window[0], s[0][0], s[0][2]]);
+        s.forEach(z => segs.push(z.slice()));
+        segs.push([s[s.length - 1][1], SER.window[1], s[s.length - 1][2]]);
+      }
+      for (let i = segs.length - 1; i > 0; i--) if (segs[i][2] === segs[i - 1][2]) { segs[i - 1][1] = segs[i][1]; segs.splice(i, 1); }
+      const sy = plotB + 24, sh = 14;
+      const gs = svgc.append("g");
+      segs.forEach(([o, yng, mode]) => {
+        const x0 = x(Math.min(o, SER.window[0])), x1 = x(Math.max(yng, SER.window[1]));
+        if (x1 - x0 < 0.5) return;
+        gs.append("rect").attr("x", x0).attr("y", sy).attr("width", x1 - x0).attr("height", sh).attr("fill", css("--m-" + mode)).attr("stroke", css("--panel")).attr("stroke-width", 1);
+        if (x1 - x0 > 30) gs.append("text").attr("class", "modelab").attr("x", (x0 + x1) / 2).attr("y", sy + 10.5).attr("text-anchor", "middle").text(mode);
+      });
+      svgc.append("text").attr("class", "lab").attr("x", m.l - 6).attr("y", sy + 10.5).attr("text-anchor", "end").text("AMOC");
+    }
+    svgc.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(-(w - m.l - m.r)).tickFormat("")).call(g => g.select(".domain").remove());
+    // frame window (the map covers only part of the chart)
+    const fw = [AGES[0], AGES[AGES.length - 1]];
+    [[SER.window[0], fw[0]], [fw[1], SER.window[1]]].forEach(([a, b]) => {
+      if (a === b) return;
+      svgc.append("rect").attr("x", x(a)).attr("y", m.t).attr("width", Math.max(0, x(b) - x(a))).attr("height", plotB - m.t).attr("fill", css("--bg")).attr("opacity", 0.6);
+    });
+    if (state.sel) {
+      svgc.append("path").datum(rows).attr("fill", "none").attr("stroke", colorOf(state.sel)).attr("stroke-width", 2)
+        .attr("d", d3.line().x(d => x(d.age)).y(d => y(d[state.sel])).curve(curve));
+    } else {
+      svgc.append("g").selectAll("path").data(rows._st).join("path").attr("fill", d => colorOf(d.key)).attr("stroke", "none")
+        .attr("d", d3.area().x(d => x(d.data.age)).y0(d => y(d[0])).y1(d => y(d[1])).curve(curve));
+      if (!isQ()) {
+        // Totals of the other pathways, for comparison; direct labels at the young end.
+        const ends = [];
+        PATHWAYS.forEach(pw => {
+          const t = serNode(pw).total, own = pw === state.pathway;
+          svgc.append("path").datum(t).attr("fill", "none").attr("stroke", css(own ? "--fg" : "--fg-2")).attr("stroke-width", own ? 1.6 : 1.1)
+            .attr("stroke-dasharray", own ? null : (pw === "cold" ? "5 3" : "1.5 2.5"))
+            .attr("d", d3.line().x((v, i) => x(serAges[i])).y(v => y(v * SUNIT)));
+          ends.push({ pw, y: y(t[t.length - 1] * SUNIT) + 3 });
+        });
+        // Keep the end labels at least 12 px apart, in value order.
+        ends.sort((a, b) => a.y - b.y);
+        for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 12);
+        ends.forEach(e => svgc.append("text").attr("class", "lab").attr("x", w - m.r + 4).attr("y", e.y).text(e.pw));
+      }
+    }
+    svgc.append("g").attr("class", "axis").attr("transform", `translate(0,${plotB})`).call(d3.axisBottom(x).ticks(Math.min(16, w / 50)).tickFormat(d => d / 1000));
+    svgc.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d => isQ() ? (d * 1000).toFixed(0) : noNegZero(d.toFixed(2)).replace("-", "−")));
+    svgc.append("text").attr("class", "lab").attr("x", w - m.r).attr("y", h - 4).attr("text-anchor", "end").text("Age (ka BP)");
+    svgc.append("text").attr("class", "lab").attr("transform", `translate(12,${(m.t + plotB) / 2}) rotate(-90)`).attr("text-anchor", "middle").text(isQ() ? "Discharge (mSv)" : "δ¹⁸O anomaly (‰)");
+    const cursor = svgc.append("line").attr("class", "cursor").attr("y1", m.t).attr("y2", plotB);
+    const hair = svgc.append("line").attr("class", "hair").attr("y1", m.t).attr("y2", plotB).style("display", "none");
+    svgc.append("rect").attr("x", m.l).attr("y", m.t).attr("width", w - m.l - m.r).attr("height", plotB - m.t).attr("fill", "transparent").style("cursor", "crosshair")
+      .on("pointermove", e => { const [px] = d3.pointer(e); const { v, age, total } = valuesAt(x.invert(px)); hair.style("display", null).attr("x1", x(age)).attr("x2", x(age)); showTip(e, seriesTip(age, v, total)); })
       .on("pointerleave", () => { hair.style("display", "none"); hideTip(); })
       .on("click", e => { const [px] = d3.pointer(e); setAge(x.invert(px)); });
+    chart = { x, cursor };
+    moveCursor();
+  }
+  function moveCursor() { if (chart) chart.cursor.attr("x1", chart.x(state.age)).attr("x2", chart.x(state.age)); }
+  function seriesTip(age, v, total) {
+    const b = el("div");
+    b.append(el("div", "t", `${isQ() ? DATA.forcings[state.forcing].label : state.site} · ${ka(age)} ka BP`));
+    (state.sel ? [state.sel] : STACK.slice().reverse()).forEach(k => b.append(row(colorOf(k), byCode[k].short + " · " + byCode[k].name_2026b, `${fmtV(v[k])} ${unit()}`)));
+    b.append(row(null, "Total", `${fmtV(total ?? d3.sum(Object.values(v)))} ${unit()}`));
+    if (!isQ()) b.append(row(null, "AMOC mode", modeAt(state.pathway, age)));
+    return b;
   }
 
-  function seriesTip(recon, age, v) {
-    const box = document.createElement("div");
-    const t = document.createElement("div"); t.className = "t"; t.textContent = `${recon} · ${(age / 1000).toFixed(1)} ka BP`; box.appendChild(t);
-    const keys = state.sel ? [state.sel] : STACK.slice().reverse();
-    keys.forEach(k => {
-      const val = v[k];
-      const row = document.createElement("div"); row.className = "row";
-      const key = document.createElement("i"); key.className = "key"; key.style.background = colorOf(k);
-      const s = document.createElement("span"); s.textContent = byCode[k].short + " · " + byCode[k].name_2026b;
-      const b = document.createElement("b"); b.textContent = `${fmt(val)} ${unit()}`;
-      row.append(key, s, b); box.appendChild(row);
-    });
-    const tot = document.createElement("div"); tot.className = "row";
-    const s = document.createElement("span"); s.textContent = "Total"; const b = document.createElement("b"); b.textContent = `${fmt(d3.sum(Object.values(v)))} ${unit()}`;
-    tot.append(document.createElement("i"), s, b); box.appendChild(tot);
-    return box;
+  // ---- readout, legend, table, text ---------------------------------------------
+  function drawReadout() {
+    const { v, age, total } = valuesAt(state.age), tot = total ?? d3.sum(Object.values(v));
+    const top = CODES.reduce((a, b) => Math.abs(v[b]) > Math.abs(v[a]) ? b : a);
+    const host = $("readout"); host.replaceChildren();
+    const cell = (val, lab) => { const d = el("div"); d.append(el("div", "v", val), el("div", "l", lab)); host.append(d); };
+    cell(`${fmtV(tot)} ${unit()}`, isQ() ? `Total discharge, ${DATA.forcings[state.forcing].label}, ${ka(age)} ka` : `Total at ${state.site}, ${ka(age)} ka`);
+    cell(byCode[top].short, `Largest contributor: ${byCode[top].name_2026b}`);
+    cell(tot ? `${(100 * v[top] / tot).toFixed(0)} %` : "–", "Its share of the total");
   }
-
-  function drawGlas() {
-    const host = $("glaspanel"); host.replaceChildren();
-    if (!state.glas || !xScale) return;
-    const w = Math.max(300, $("chart").clientWidth || 600), h = 184, m = { t: 46, r: 12, b: 22, l: 54 };
-    const x = xScale.copy();
-    const g = DATA.glas;
-    const y = d3.scaleLinear().domain(d3.extent(g.d18o)).nice().range([h - m.b, m.t]);
-    const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${w} ${h}`).attr("role", "img").attr("aria-label", "Glas stalagmite δ18O with published abrupt events");
-    DATA.events.forEach((ev, k) => {
-      const x0 = x(ev.hi), x1 = x(ev.lo);
-      svg.append("rect").attr("class", "evband").attr("x", Math.min(x0, x1)).attr("width", Math.max(2, Math.abs(x1 - x0))).attr("y", m.t).attr("height", h - m.t - m.b)
-        .attr("fill", css(ev.sign < 0 ? "--fresh" : "--resal"));
-      svg.append("text").attr("class", "evlabel").attr("x", x(ev.mid)).attr("y", m.t - 4 - (k % 4) * 10).attr("text-anchor", "middle").text(ev.event);
-    });
-    svg.append("path").datum(g.age.map((a, i) => [a, g.d18o[i]])).attr("fill", "none").attr("stroke", css("--fg-2")).attr("stroke-width", 1)
-      .attr("d", d3.line().x(d => x(d[0])).y(d => y(d[1])));
-    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${h - m.b})`).call(d3.axisBottom(x).ticks(Math.min(13, w / 55)).tickFormat(d => d / 1000));
-    svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4));
-    svg.append("text").attr("class", "evlabel").attr("transform", `translate(10,${(m.t + h - m.b) / 2}) rotate(-90)`).attr("text-anchor", "middle").text("Glas δ¹⁸O (‰)");
-    svg.append("line").attr("class", "cursor").attr("x1", x(state.age)).attr("x2", x(state.age)).attr("y1", m.t).attr("y2", h - m.b);
-  }
-
-  // ---- legend, readout, table ---------------------------------------------
   function drawLegend() {
     const L = $("legend"); L.replaceChildren();
-    const items = R.map(r => r.code);                          // paper order
-    items.forEach(k => {
-      const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", String(state.sel === k));
-      const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = colorOf(k);
-      const t = document.createElement("span"); t.textContent = byCode[k].short;
+    CODES.forEach(k => {
+      const b = el("button"); b.type = "button"; b.setAttribute("aria-pressed", String(state.sel === k));
+      const sw = el("span", "sw"); sw.style.background = colorOf(k);
       b.title = `${byCode[k].name_draft} (${byCode[k].name_2026b}). Click to show this region alone.`;
-      b.append(sw, t); b.addEventListener("click", () => toggleSel(k)); L.appendChild(b);
+      b.append(sw, el("span", "", byCode[k].short)); b.addEventListener("click", () => { state.sel = state.sel === k ? null : k; renderChartSide(); drawOverlay(); }); L.append(b);
     });
-  }
-  function drawReadout() {
-    const { v, age } = valuesAt(state.recon, state.age);
-    const total = d3.sum(Object.values(v));
-    const top = R.map(r => r.code).reduce((a, b) => Math.abs(v[b]) > Math.abs(v[a]) ? b : a);
-    const el = $("readout"); el.replaceChildren();
-    const cell = (val, lab) => { const d = document.createElement("div"); const a = document.createElement("div"); a.className = "v"; a.textContent = val; const l = document.createElement("div"); l.className = "l"; l.textContent = lab; d.append(a, l); el.appendChild(d); };
-    cell(`${fmt(total)} ${unit()}`, `Total, ${state.recon} at ${(age / 1000).toFixed(1)} ka`);
-    cell(byCode[top].short, `Largest contributor: ${byCode[top].name_2026b}`);
-    cell(total ? `${(100 * v[top] / total).toFixed(0)} %` : "–", "Its share of the total");
   }
   function drawTable() {
     const wrap = $("tablewrap"); wrap.hidden = !state.table; if (!state.table) return;
-    const { v, age } = valuesAt(state.recon, state.age); const total = d3.sum(Object.values(v));
-    const t = document.createElement("table");
-    const cap = document.createElement("caption"); cap.className = "note"; cap.style.textAlign = "left"; cap.textContent = `${state.recon}, ${(age / 1000).toFixed(1)} ka BP`; t.appendChild(cap);
-    const hr = t.insertRow(); ["Code", "Region (Endres et al. 2026b)", "Ice sheet", state.qty === "Q" ? "Discharge (mSv)" : "Anomaly (‰)", "Share (%)"].forEach(s => { const th = document.createElement("th"); th.textContent = s; hr.appendChild(th); });
+    const { v, age, total } = valuesAt(state.age), tot = total ?? d3.sum(Object.values(v));
+    const t = el("table"); const cap = el("caption", "note", `${isQ() ? DATA.forcings[state.forcing].label : state.site + ", " + DATA.forcings[state.forcing].label + ", " + DATA.pathways[state.pathway].label}, ${ka(age)} ka BP`); t.append(cap);
+    const hr = t.insertRow(); ["Code", "Region (Endres et al. 2026b)", "Ice sheet", isQ() ? "Discharge (mSv)" : "Anomaly (‰)", "Share (%)"].forEach(s => { const th = el("th", "", s); hr.append(th); });
     R.forEach(r => {
-      const tr = t.insertRow();
-      [r.short, r.name_2026b, r.ice_sheet].forEach(s => { tr.insertCell().textContent = s; });
-      const c1 = tr.insertCell(); c1.className = "num"; c1.textContent = fmt(v[r.code]);
-      const c2 = tr.insertCell(); c2.className = "num"; c2.textContent = total ? (100 * v[r.code] / total).toFixed(1) : "–";
+      const tr = t.insertRow(); [r.short, r.name_2026b, r.ice_sheet].forEach(s => { tr.insertCell().textContent = s; });
+      const c1 = tr.insertCell(); c1.className = "num"; c1.textContent = fmtV(v[r.code]);
+      const c2 = tr.insertCell(); c2.className = "num"; c2.textContent = tot ? (100 * v[r.code] / tot).toFixed(1) : "–";
     });
     wrap.replaceChildren(t);
   }
-  function drawLegendBar() {
-    const c = seqScale(); const mx = magMax();
-    $("leg-bar").style.background = `linear-gradient(to right, ${d3.range(0, 1.01, 0.1).map(p => c(p * p * mx)).join(",")})`;
-    $("leg-lo").textContent = "0"; $("leg-hi").textContent = `${state.qty === "Q" ? fmtQ(mx) : "−" + fmtA(mx)} ${unit()}`;
+  function drawTexts() {
+    const f = DATA.forcings[state.forcing], p = DATA.pathways[state.pathway];
+    $("map-title").textContent = `Surface δ¹⁸O anomaly · ${f.label}`;
+    const s = SITES.find(x => x.name === state.site);
+    $("chart-title").textContent = isQ() ? `Regional discharge · ${f.label}` : `Anomaly at ${state.site}` + (state.sel ? ` · ${byCode[state.sel].name_2026b}` : "");
+    $("chart-note").textContent = isQ()
+      ? `Meltwater discharge per region from the ${f.label} reconstruction, at its native ${f.step}-yr steps. This is the forcing before any transport.`
+      : `Stacked: the contribution of each source region, for the ${p.label.toLowerCase()} pathway. Lines: the total for each pathway (solid = selected). `
+        + (s.domain === "ocean" ? "Ocean site: mean over a ±2° box around the core. " : `Land site: surface field weighted by where the site's rain picks up its moisture (trajectory run ${DATA.uptake_run.cold} for cold, ${DATA.uptake_run.zonal} for zonal and meridional). `)
+        + "Shaded ends: outside the map's time range.";
+  }
+  function drawModechip() {
+    const m = modeAt(state.pathway, state.age);
+    $("modechip").textContent = `${DATA.pathways[state.pathway].label.split(" (")[0]} pathway · now ${MODE_LABEL[m] || m}`;
+  }
+  function drawBanner() {
+    const b = $("banner");
+    if (!DATA.placeholder) { b.hidden = true; return; }
+    b.hidden = false; b.replaceChildren();
+    const s = el("b", "", "Placeholder kernels. "); b.append(s,
+      document.createTextNode(`The impulse responses are stand-ins (${DATA.kernels}): the 500-yr equilibrium pattern of each mode with an invented response time. Spatial patterns and site weights are right at equilibrium; timing and transient amplitudes are not. Do not interpret or share.`));
+  }
+  function drawFooter() {
+    const f = $("footer"); f.replaceChildren();
+    const lines = [
+      "Method: the decadal source-region δ¹⁸O anomaly of each forcing (−35 ‰ end-member; the forcing of Endres et al., in prep.) is convolved with the HadCM3 surface response to a 10-yr dye pulse in each region, A(t) = Σₖ 10 · F(t − k) · h(k). The mixed pathway switches the AMOC mode on a fixed schedule; water released under one mode keeps spreading after a switch.",
+      "Pulse runs: xpran (cold), xprao (zonal), xpujc (meridional), each after 10 yr of its constant-input parent run. The meridional pulse branches from xpram, not from the paper's meridional run xpral; it is used only in the mixed pathway, 14.7–13.7 ka.",
+      `Kernels: ${DATA.kernels}. Built from pipeline commit ${DATA.run.git_commit || "?"} on ${DATA.run.created || "?"}. Regions and sites: Endres et al. (2026b). Coastline: Natural Earth 110 m.`,
+    ];
+    lines.forEach(t => f.append(el("div", "", t)));
   }
 
-  // ---- state & wiring ---------------------------------------------------------
-  function sliderSetup() {
-    const s = $("slider"), a = rec(state.recon).ages, st = DATA.recon[state.recon].step;
-    const hi = d3.max(a), lo = Math.max(0, d3.min(a));
-    s.min = -hi; s.max = -lo; s.step = st;                     // negative so right = younger
-    state.age = Math.min(hi, Math.max(lo, Math.round(state.age / st) * st));
-    s.value = -state.age;
+  // ---- state & wiring -------------------------------------------------------------
+  function makeSeg(hostId, keys, label, attr) {
+    const host = $(hostId); host.replaceChildren();
+    keys.forEach(k => { const b = el("button", "", label(k)); b.type = "button"; b.dataset[attr] = k; b.addEventListener("click", () => { state[attr] = k; syncSegs(); onSourceChange(); }); host.append(b); });
   }
-  function setAge(a) {
-    const st = DATA.recon[state.recon].step, ages = rec(state.recon).ages;
-    state.age = Math.min(d3.max(ages), Math.max(Math.max(0, d3.min(ages)), Math.round(a / st) * st));
-    $("slider").value = -state.age; render();
+  function syncSegs() {
+    document.querySelectorAll("[data-forcing]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.forcing === state.forcing)));
+    document.querySelectorAll("[data-pathway]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pathway === state.pathway)));
   }
-  function toggleSel(code) { state.sel = state.sel === code ? null : code; render(); }
-  function render() {
-    $("age-val").textContent = (state.age / 1000).toFixed(1);
-    $("em").disabled = state.qty !== "A";
-    $("chart-title").textContent = (state.qty === "Q" ? "Regional discharge" : "Source-region δ¹⁸O anomaly") + (state.sel ? ` · ${byCode[state.sel].name_2026b}` : "");
-    const maps = $("maps"); maps.replaceChildren(); maps.className = "maps" + (state.compare ? " compare" : "");
-    (state.compare ? ["GLAC-1D", "ICE-6G"] : [state.recon]).forEach(r => drawMap(maps, r));
-    drawReadout(); drawLegend(); drawChart(); drawGlas(); drawTable(); drawLegendBar();
-  }
+  makeSeg("forcing-seg", FORCINGS, k => DATA.forcings[k].label, "forcing");
+  makeSeg("pathway-seg", PATHWAYS, k => ({ cold: "Cold", zonal: "Zonal", mixed: "Mixed" })[k] || k, "pathway");
+  const siteSel = $("site");
+  SITES.forEach(s => { const o = el("option", "", `${s.name} · ${s.type.toLowerCase()}`); o.value = s.name; siteSel.append(o); });
+  { const o = el("option", "", "Discharge (forcing itself)"); o.value = DISCHARGE; siteSel.append(o); }
 
-  document.querySelectorAll("[data-recon]").forEach(b => b.addEventListener("click", () => {
-    state.recon = b.dataset.recon; document.querySelectorAll("[data-recon]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); sliderSetup(); render();
-  }));
-  document.querySelectorAll("[data-qty]").forEach(b => b.addEventListener("click", () => {
-    state.qty = b.dataset.qty; document.querySelectorAll("[data-qty]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); render();
-  }));
-  $("em").addEventListener("change", e => { state.em = e.target.value; render(); });
-  $("compare").addEventListener("click", e => { state.compare = !state.compare; e.currentTarget.setAttribute("aria-pressed", String(state.compare)); render(); });
-  $("glas").addEventListener("click", e => { state.glas = !state.glas; e.currentTarget.setAttribute("aria-pressed", String(state.glas)); render(); });
-  $("tbl").addEventListener("click", e => { state.table = !state.table; e.currentTarget.setAttribute("aria-pressed", String(state.table)); render(); });
-  $("slider").addEventListener("input", e => setAge(-Number(e.target.value)));
-  $("back").addEventListener("click", () => setAge(state.age + DATA.recon[state.recon].step));
-  $("fwd").addEventListener("click", () => setAge(state.age - DATA.recon[state.recon].step));
-  let timer = null;
-  $("play").addEventListener("click", e => {
-    state.playing = !state.playing; e.currentTarget.textContent = state.playing ? "Pause" : "Play"; e.currentTarget.setAttribute("aria-label", state.playing ? "Pause" : "Play");
-    if (state.playing) {
-      if (state.age <= Math.max(0, d3.min(rec(state.recon).ages))) setAge(d3.max(rec(state.recon).ages));
-      timer = setInterval(() => {
-        const lo = Math.max(0, d3.min(rec(state.recon).ages));
-        if (state.age <= lo) { $("play").click(); return; }
-        setAge(state.age - DATA.recon[state.recon].step);
-      }, state.recon === "GLAC-1D" ? 120 : 450);
-    } else { clearInterval(timer); }
+  const slider = $("slider");
+  const step = AGES[0] - AGES[1];
+  slider.min = -AGES[0]; slider.max = -AGES[AGES.length - 1]; slider.step = step;
+  function clampAge(a) { return Math.min(AGES[0], Math.max(AGES[AGES.length - 1], Math.round(a / step) * step)); }
+  function setAge(a) { state.age = clampAge(a); slider.value = -state.age; onTime(); }
+  function setSite(name) { state.site = name; siteSel.value = name; state.sel = null; renderChartSide(); drawOverlay(); }
+  function onTime() {
+    $("age-val").textContent = (state.age / 1000).toFixed(2);
+    drawField(); moveCursor(); drawReadout(); drawModechip(); if (state.table) drawTable();
+  }
+  function renderChartSide() { drawTexts(); drawLegend(); drawChart(); drawReadout(); drawTable(); }
+  function onSourceChange() { refreshField(); renderChartSide(); drawModechip(); }
+  function renderAll() { buildLut(); drawLegendBar(); sizeCanvas(); drawOverlay(); refreshField(); renderChartSide(); drawModechip(); drawBanner(); drawFooter(); }
+
+  slider.addEventListener("input", e => setAge(-Number(e.target.value)));
+  siteSel.addEventListener("change", e => setSite(e.target.value));
+  $("tbl").addEventListener("click", e => { state.table = !state.table; e.currentTarget.setAttribute("aria-pressed", String(state.table)); drawTable(); });
+  $("speed").addEventListener("change", e => { state.speed = Number(e.target.value); });
+  let raf = null, last = 0, acc = 0;
+  function tick(ts) {
+    if (!state.playing) return;
+    const dt = last ? (ts - last) / 1000 : 0; last = ts; acc += dt * state.speed;
+    if (acc >= step) {
+      const n = Math.floor(acc / step); acc -= n * step;
+      const next = state.age - n * step;
+      if (next <= AGES[AGES.length - 1]) { setAge(AGES[AGES.length - 1]); stop(); return; }
+      setAge(next);
+    }
+    raf = requestAnimationFrame(tick);
+  }
+  function stop() { state.playing = false; cancelAnimationFrame(raf); $("play").textContent = "Play"; $("play").setAttribute("aria-label", "Play"); }
+  $("play").addEventListener("click", () => {
+    if (state.playing) { stop(); return; }
+    if (state.age <= AGES[AGES.length - 1]) setAge(AGES[0]);
+    state.playing = true; last = 0; acc = 0; $("play").textContent = "Pause"; $("play").setAttribute("aria-label", "Pause");
+    raf = requestAnimationFrame(tick);
   });
 
   let rt = null;
-  const rerender = () => { clearTimeout(rt); rt = setTimeout(render, 80); };
+  const rerender = () => { clearTimeout(rt); rt = setTimeout(renderAll, 80); };
   window.addEventListener("resize", rerender);
   try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender); } catch (e) {}
   new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
   function start(saved) {
-    Object.assign(state, saved || {}); state.playing = false;
-    document.querySelectorAll("[data-recon]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.recon === state.recon)));
-    document.querySelectorAll("[data-qty]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.qty === state.qty)));
-    $("em").value = state.em; $("compare").setAttribute("aria-pressed", String(state.compare));
-    $("glas").setAttribute("aria-pressed", String(state.glas)); $("tbl").setAttribute("aria-pressed", String(state.table));
-    sliderSetup(); render();
+    const s = saved || {};
+    ["forcing", "pathway", "site", "age", "sel", "table", "speed"].forEach(k => { if (s[k] !== undefined) state[k] = s[k]; });
+    if (!FORCINGS.includes(state.forcing)) state.forcing = FORCINGS[0];
+    if (!PATHWAYS.includes(state.pathway)) state.pathway = PATHWAYS[0];
+    if (state.site !== DISCHARGE && !SITES.some(x => x.name === state.site)) state.site = SITES[0].name;
+    state.playing = false; state.age = clampAge(state.age);
+    syncSegs(); siteSel.value = state.site; $("speed").value = String(state.speed); slider.value = -state.age;
+    $("tbl").setAttribute("aria-pressed", String(state.table)); $("age-val").textContent = (state.age / 1000).toFixed(2);
+    renderAll();
   }
   window.claude?.hot?.snapshot?.(() => ({ ...state, playing: false }));
   window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
