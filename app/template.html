@@ -24,6 +24,7 @@
   --r-Med: #1f77b4; --r-Bri: #f1780b; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #9b4c3c; --r-NLau: #de72bd; --r-SLau: #a5a608; --r-GulofMex: #00b3c3;
   /* sequential ramp for freshening magnitude, near-zero first */
   --s1: #e3eefb; --s2: #9ec5f4; --s3: #5598e7; --s4: #256abf; --s5: #0d366b;
+  --plume-0: #1c5cab; --plume-1: #9ec5f4;   /* forward-model schematic */
   --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -37,6 +38,7 @@
     --m-cold: #2b3640; --m-zonal: #1c252d; --m-merid: #3a4855;
     --r-Med: #1f77b4; --r-Bri: #db6b00; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #a15142; --r-NLau: #cd63ad; --r-SLau: #959600; --r-GulofMex: #03a2b1;
     --s1: #1a2835; --s2: #184f95; --s3: #2a78d6; --s4: #6da7ec; --s5: #cde2fb;
+    --plume-0: #6da7ec; --plume-1: #184f95;
     color-scheme: dark;
   }
 }
@@ -48,6 +50,7 @@
   --m-cold: #2b3640; --m-zonal: #1c252d; --m-merid: #3a4855;
   --r-Med: #1f77b4; --r-Bri: #db6b00; --r-Fen: #2ca02c; --r-EurArc: #d62728; --r-AmeArc: #9467bd; --r-GIS: #a15142; --r-NLau: #cd63ad; --r-SLau: #959600; --r-GulofMex: #03a2b1;
   --s1: #1a2835; --s2: #184f95; --s3: #2a78d6; --s4: #6da7ec; --s5: #cde2fb;
+  --plume-0: #6da7ec; --plume-1: #184f95;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -123,6 +126,12 @@ th { font: 500 11px var(--font-body); letter-spacing: 0.06em; text-transform: up
 td.num { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 footer { color: var(--fg-3); font-size: 12px; display: grid; gap: 4px; max-width: 115ch; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.howto { gap: 12px; }
+.howto-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+.howto-head h2 { margin: 0; font: 600 22px/1.1 var(--font-display); letter-spacing: 0.01em; }
+header .btn { align-self: center; }
+/* Forward-model schematic (scripts/make_forward_model_schematic.py), scoped under fm- */
+/*__HOWTO_CSS__*/
 </style>
 <!--HEAD-END-->
 <div class="wrap">
@@ -131,10 +140,19 @@ footer { color: var(--fg-3); font-size: 12px; display: grid; gap: 4px; max-width
       <div class="eyebrow">NISA · deglacial meltwater · HadCM3 impulse responses</div>
       <h1>Meltwater Discharge Explorer</h1>
     </div>
+    <button id="howto-btn" class="btn" type="button" aria-expanded="false" aria-controls="howto">How the model works</button>
     <p class="sub">Meltwater from nine ice-sheet drainage regions, carried by the ocean. The globe shows how the surface δ¹⁸O anomaly spreads, decade by decade. The chart shows what reaches one proxy site and where it came from. Pick a reconstruction and an AMOC pathway, then play or drag through the deglaciation.</p>
   </header>
 
   <div class="banner" id="banner" hidden></div>
+
+  <section class="card howto" id="howto" aria-labelledby="howto-title" hidden>
+    <div class="howto-head">
+      <h2 id="howto-title">How the model works</h2>
+      <button id="howto-close" class="btn" type="button">Close</button>
+    </div>
+    <!--__HOWTO__-->
+  </section>
 
   <section class="controls" aria-label="Controls">
     <div class="group"><span class="eyebrow">Forcing</span>
@@ -212,7 +230,7 @@ const DATA = /*__DATA__*/null;
   const MODE_LABEL = { cold: "Cold (weak AMOC)", zonal: "Zonal (strong AMOC)", merid: "Meridional" };
 
   const state = { forcing: FORCINGS[0], pathway: PATHWAYS.includes("mixed") ? "mixed" : PATHWAYS[0],
-    site: "La Vallina (NISA)", age: 15000, sel: null, table: false, playing: false, speed: 250 };
+    site: "La Vallina (NISA)", age: 15000, sel: null, table: false, playing: false, speed: 250, howto: false };
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const colorOf = k => css("--r-" + k);
@@ -612,6 +630,13 @@ const DATA = /*__DATA__*/null;
   siteSel.addEventListener("change", e => setSite(e.target.value));
   $("tbl").addEventListener("click", e => { state.table = !state.table; e.currentTarget.setAttribute("aria-pressed", String(state.table)); drawTable(); });
   $("speed").addEventListener("change", e => { state.speed = Number(e.target.value); });
+  function setHowto(open, scroll) {
+    state.howto = open; $("howto").hidden = !open; $("howto-btn").setAttribute("aria-expanded", String(open));
+    if (open && scroll) $("howto").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    if (!open && scroll) $("howto-btn").focus();
+  }
+  $("howto-btn").addEventListener("click", () => setHowto(!state.howto, true));
+  $("howto-close").addEventListener("click", () => setHowto(false, true));
   let raf = null, last = 0, acc = 0;
   function tick(ts) {
     if (!state.playing) return;
@@ -640,13 +665,13 @@ const DATA = /*__DATA__*/null;
 
   function start(saved) {
     const s = saved || {};
-    ["forcing", "pathway", "site", "age", "sel", "table", "speed"].forEach(k => { if (s[k] !== undefined) state[k] = s[k]; });
+    ["forcing", "pathway", "site", "age", "sel", "table", "speed", "howto"].forEach(k => { if (s[k] !== undefined) state[k] = s[k]; });
     if (!FORCINGS.includes(state.forcing)) state.forcing = FORCINGS[0];
     if (!PATHWAYS.includes(state.pathway)) state.pathway = PATHWAYS[0];
     if (state.site !== DISCHARGE && !SITES.some(x => x.name === state.site)) state.site = SITES[0].name;
     state.playing = false; state.age = clampAge(state.age);
     syncSegs(); siteSel.value = state.site; $("speed").value = String(state.speed); slider.value = -state.age;
-    $("tbl").setAttribute("aria-pressed", String(state.table)); $("age-val").textContent = (state.age / 1000).toFixed(2);
+    $("tbl").setAttribute("aria-pressed", String(state.table)); setHowto(!!state.howto, false); $("age-val").textContent = (state.age / 1000).toFixed(2);
     renderAll();
   }
   window.claude?.hot?.snapshot?.(() => ({ ...state, playing: false }));

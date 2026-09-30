@@ -12,6 +12,7 @@ Inputs (made by the pipeline; see CLAUDE.md):
   app/frames/meta.json and app/frames/*.bin   (scripts/export_app_frames.py)
   app/regions_hadcm3.geojson                  (scripts/make_region_geojson.py)
   data/Discharge_*.csv, myconfig/SITES.py, myconfig/PATHWAYS.py
+  scripts/make_forward_model_schematic.py     ("How the model works" panel)
 
 Outputs
   app/discharge_explorer.html   full HTML document. Serve app/ over http to
@@ -27,6 +28,7 @@ Standard library only. Run from the repository root:
 import argparse
 import csv
 import gzip
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -87,6 +89,14 @@ def site_series(src):
     return out
 
 
+def howto():
+    """The forward-model schematic as a scoped fragment (scripts/make_forward_model_schematic.py)."""
+    spec = importlib.util.spec_from_file_location("fm_schematic", ROOT / "scripts/make_forward_model_schematic.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.build(fragment=True)
+
+
 def build():
     real = OUTPUTS / "run_info.json"
     src = OUTPUTS if real.exists() else OUTPUTS / "placeholder"
@@ -138,6 +148,9 @@ def main():
     template = (APP / "template.html").read_text(encoding="utf-8")
     assert template.count("/*__DATA__*/null") == 1, "data placeholder missing"
     page = template.replace("/*__DATA__*/null", blob)
+    fm_css, fm_html = howto()
+    assert page.count("/*__HOWTO_CSS__*/") == 1 and page.count("<!--__HOWTO__-->") == 1, "howto placeholders missing"
+    page = page.replace("/*__HOWTO_CSS__*/", fm_css).replace("<!--__HOWTO__-->", fm_html)
     head, body = page.split("<!--HEAD-END-->", 1)
 
     full = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"

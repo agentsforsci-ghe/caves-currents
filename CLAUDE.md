@@ -52,6 +52,7 @@ python3 scripts/make_uptake_weights.py      # once: trajectories -> data/meltmod
 python3 scripts/make_region_geojson.py      # once: HadCM3 input cells -> app/regions_hadcm3.geojson
 python3 scripts/run_convolution.py          # uses data/kernels/ if present, else the placeholder
 python3 scripts/export_app_frames.py        # decadal fields -> app/frames/ (8-bit, about 5 MB per forcing x pathway)
+python3 scripts/make_forward_model_schematic.py --out <path>   # standalone forward-model schematic (also inlined in the app)
 ```
 
 Without the kernel bundle, `run_convolution.py` falls back to a **placeholder**: the equilibrium field spread over time with an invented 100-yr response time. Its outputs go to `outputs/convolution/placeholder/`, which is gitignored. Never report, commit or publish them as results.
@@ -113,6 +114,7 @@ Stacked charts use this bottom-to-top order, which keeps neighbouring colours di
 
 - `discharge_explorer.html` is generated, so edit `template.html` or `build_app.py` and rebuild.
 - **v2** reads the pipeline outputs. The map frames are fetched from `app/frames/`, so test over http, not `file://`. `build_app.py --publish-out` refuses placeholder outputs, and a page built from them must not be committed. Publish the six `frames/*.bin` as artifact `files`.
+- The "How the model works" panel is `scripts/make_forward_model_schematic.py`, inlined by `build_app.py`. Its classes and SVG ids carry an `fm-` prefix, so it can't clash with the app's styles. Keep it that way. Its standalone copy is https://claude.ai/artifact/CqfLtTKp2MCwDi9L8YFa6x; republish the `--out` file to the same URL. Only the forcing panel shows real data. Once the kernels arrive, the pulse-response curves can use the real ones.
 - In the Chrome automation tab, `requestAnimationFrame` does not run, because the tab reports itself as hidden. To test playback there, replace it with a `setTimeout` stand-in.
 - `regions_approx.geojson` holds hand-digitised, approximate outlines from Endres et al. (2026b, Fig. 2a). Exact HadCM3 masks with the same `code` property can replace it without code changes.
 - The shared page is https://claude.ai/artifact/HMQMC2ACsbpvvDQNyRgcPG, which is private until shared. Republish the `--publish-out` copy to the same URL to keep the link.
