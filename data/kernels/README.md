@@ -18,11 +18,15 @@ Leeds server with `scripts/export_pulse_kernels.py`, then copy them here.
 
    Each pulse run starts *after* its 10-yr pulse, so the script prepends the
    first 10 years of the parent constant-input run, as the notebook did.
-3. Run `python export_pulse_kernels.py --dry-run`. It should find 9 dye files
+3. Run `python export_pulse_kernels.py --dry-run` with **Python 3.8 or newer**.
+   The system `python` on the server may be Python 2, which fails with
+   `SyntaxError` at the first f-string. Use the notebooks' environment
+   instead, `/nfs/annie/eelse/conda/envs/py3/bin/python`, or run
+   `conda activate py3` first. It should find 9 dye files
    per experiment. It also prints each time axis and warns if a pulse run does
    not start the year after its prepended pulse years.
-4. Run `python export_pulse_kernels.py`. It needs numpy, xarray and netCDF4;
-   the `dyetracer` environment has them.
+4. Run `python export_pulse_kernels.py` in the same environment. It needs
+   numpy, xarray, dask and netCDF4.
 5. Copy the `pulse_kernels.tar.gz` it prints home and unpack it in this folder.
 
 ## Files

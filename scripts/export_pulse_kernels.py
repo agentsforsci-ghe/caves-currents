@@ -1,10 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Export the HadCM3 dye-pulse (impulse-response) fields as one small bundle.
 
 Run this ON THE LEEDS SERVER, where the raw experiment output lives. It needs
-only numpy, xarray and netCDF4 (the ``dyetracer`` environment is fine), and
-nothing else from this repository.
+Python >= 3.8 with numpy, xarray, dask and netCDF4, and nothing else from this
+repository. The system `python` there may be Python 2; use the conda env the
+notebooks ran in, e.g.
+
+    /nfs/annie/eelse/conda/envs/py3/bin/python export_pulse_kernels.py --dry-run
 
 What it writes (to OUTDIR)
 --------------------------
