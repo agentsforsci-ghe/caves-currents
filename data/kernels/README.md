@@ -61,3 +61,16 @@ Consequences:
   the paper's merid runs, not from xpram. A mismatch there may be real.
 - The merid kernel is used only in the **mixed** pathway, for 14.7–13.7 ka.
   The cold and zonal pathways do not depend on it.
+
+## Checks on the bundle (2026-09-30)
+
+- **Contents.** `kernel(mode, dye, lag, latitude, longitude)` with 3 modes, 9 dyes, 50 decadal lags and 72 × 288 cells (0–90°N). About 48 % of cells are land (NaN). Small negative values, down to −0.037, hold 0.1 % of the dye mass and are left as they are.
+- **Pulse continuity.** In the source regions, the second decade (the first of the pulse run) is 0.2–0.35× the first decade (the parent's pulse years), and the dye keeps decaying after that. So the pulse run continues a pulse of 1 unit per year, not 10.
+- **Scaling.** The 50 decadal responses add up to the constant-input equilibrium:
+  - Cold and zonal, per site (weighted over regions): 0.85–1.16 against `data/meltmodel_site_weights.csv`.
+  - Over the North Atlantic box: 1.00 (cold) and 1.02 (zonal).
+  - So the convolution uses **no ×10**, which the 2025.05 notebook's deglacial cells did use. Decided with Laura.
+- **Merid.** Against the paper's `mean_dye_merid.nc`, the ratio is 1.08 over the North Atlantic box but 0.49 (PS2644-5) to 1.16 at single sites. This fits the xpram parent (see the caveat above).
+- **Notebook cross-check** (`notebook_point_kernels.nc`):
+  - PS2644-5, cold and zonal: identical to the notebook (r = 1.000, amplitude 1.00).
+  - NISA: same shape (r ≈ 0.998), but 1.4× (cold) and 1.7× (zonal) larger. The notebook weighted NISA with `moisturesource.nc`, while v2 uses the trajectory uptake masks.

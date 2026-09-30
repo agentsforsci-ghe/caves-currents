@@ -58,7 +58,7 @@ R/         site_metrics.R           five metrics + spider plot, sourced by any .
 
 **Forcings.** Adding a forcing means one entry in `FORCINGS.py`. As a fallback, any CSV with a `time_bp` column plus the 9 region-code columns also works. GLAC-1D and ICE-6G are configured as the current files (negate `time` or `t_adj`, `<code> d18O (-35.0)`).
 
-**Convolution maths.** Reproduce the notebook exactly: `np.convolve(input_decadal * 10, kernel_decadal, "full")`. The output is extended by 500 yr for the tails.
+**Convolution maths.** `np.convolve(input_decadal, kernel_decadal, "full")`. The notebook's ×10 was dropped after the scaling check on 2026-09-30 (decision: Laura). The output is extended by 500 yr for the tails.
 
 **Speed.** Convolve the point kernels for the site series. For the maps, use `scipy.signal.fftconvolve` along time on all cells at once, instead of the notebook's per-cell loop that took 30 minutes.
 

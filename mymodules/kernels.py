@@ -1,9 +1,9 @@
 """Impulse-response kernels: the exported HadCM3 pulse bundle or a placeholder.
 
 A kernel is kernel(mode, dye, lag, latitude, longitude): the surface dye
-response, in 10-yr means, to a 10-yr dye pulse in one input region. The
-convolution (mymodules/convolution.py) multiplies the decadal forcing by 10,
-as the 2025.05 notebook did.
+response, in 10-yr means, to a 10-yr dye pulse in one input region. The 50
+lags add up to the constant-input equilibrium field, so the convolution needs
+no extra factor (mymodules/convolution.py).
 
 The placeholder exists only to build and test the pipeline before the real
 bundle is available. It spreads each mode's 500-yr equilibrium field
@@ -54,7 +54,7 @@ class Kernels:
     def placeholder_from_equilibrium(cls, tau=PLACEHOLDER_TAU, lat_min=0.0):
         t_end = np.arange(1, N_LAG + 1) * DECADE
         step = (1 - np.exp(-t_end / tau)) / (1 - np.exp(-N_LAG * DECADE / tau))
-        h = np.diff(np.concatenate([[0.0], step])) / DECADE   # sums to 1/10
+        h = np.diff(np.concatenate([[0.0], step]))           # sums to 1, like the real kernels
         fields = []
         for mode in MODES:
             ds = xr.open_dataset(str(MEAN_DYE).format(mode=mode))

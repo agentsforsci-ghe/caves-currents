@@ -1,9 +1,16 @@
 """Convolve a forcing with impulse-response kernels along an AMOC pathway.
 
 The response to a forcing F (decadal source-region d18O anomaly) with a
-decadal kernel h is, as in the 2025.05 convolution notebook,
+decadal kernel h is
 
-    A(t) = sum_k 10 * F(t - k) * h(k)
+    A(t) = sum_k F(t - k) * h(k)
+
+with no extra factor. The 50 decadal pulse responses add up to the
+constant-input equilibrium (checked with the real kernels and with the
+notebook's own constant runs), so a constant forcing reaches exactly the
+equilibrium site weights of Endres et al. (2026b). The 2025.05 notebook's
+deglacial cells multiplied F by 10, which made every anomaly ten times
+larger than that equilibrium; that factor was dropped on 2026-09-30.
 
 For a pathway that switches modes, the forcing of each decade goes into the
 kernel of the mode active in that decade, and the responses are added. The
@@ -16,7 +23,7 @@ from scipy.signal import fftconvolve
 
 from myconfig.PATHWAYS import PATHWAYS
 
-SCALE = 10.0  # decadal input x 10, as in the notebook
+SCALE = 1.0   # no extra factor; see the module docstring (the notebook used 10)
 
 
 def pathway_modes(t_model, pathway):

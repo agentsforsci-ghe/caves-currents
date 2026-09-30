@@ -388,7 +388,7 @@ def body():
       {panel_convolution()}
       <figcaption>
         <span>Each decade of forcing launches a copy of the pulse response, scaled by its size. The copies overlap and add up. A short pulse arrives late and spread out, and a long input builds up to its equilibrium.</span>
-        <span class="eq">A<sub>r</sub>(x, t) = Σ<sub>k</sub> 10 · F<sub>r</sub>(t − k) · h<sub>r</sub>(x, k)</span>
+        <span class="eq">A<sub>r</sub>(x, t) = Σ<sub>k</sub> F<sub>r</sub>(t − k) · h<sub>r</sub>(x, k)</span>
       </figcaption>
     </figure>
     <figure class="stage wide">
@@ -408,7 +408,7 @@ def body():
   </div>
   <section class="chain" aria-label="The whole chain in one equation">
     <h2>The whole chain</h2>
-    <div class="big">A<sub>site</sub>(t) = Σ<sub>r</sub> Σ<sub>x</sub> w<sub>site</sub>(x) · Σ<sub>k</sub> 10 · F<sub>r</sub>(t − k) · h<sub>r, m(t−k)</sub>(x, k)</div>
+    <div class="big">A<sub>site</sub>(t) = Σ<sub>r</sub> Σ<sub>x</sub> w<sub>site</sub>(x) · Σ<sub>k</sub> F<sub>r</sub>(t − k) · h<sub>r, m(t−k)</sub>(x, k)</div>
     <dl class="terms">
       <div><dt>F<sub>r</sub></dt><dd>source-region δ¹⁸O anomaly of region r (step 1)</dd></div>
       <div><dt>h<sub>r,m</sub></dt><dd>surface response to a 10-yr pulse, AMOC mode m (step 2)</dd></div>

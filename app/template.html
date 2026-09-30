@@ -54,6 +54,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font-body); }
 .wrap { max-width: 1360px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 32px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .wrap > * { min-width: 0; }
@@ -590,7 +591,7 @@ const DATA = /*__DATA__*/null;
   function drawFooter() {
     const f = $("footer"); f.replaceChildren();
     const lines = [
-      "Method: the decadal source-region δ¹⁸O anomaly of each forcing (−35 ‰ end-member; the forcing of Endres et al., in prep.) is convolved with the HadCM3 surface response to a 10-yr dye pulse in each region, A(t) = Σₖ 10 · F(t − k) · h(k). The mixed pathway switches the AMOC mode on a fixed schedule; water released under one mode keeps spreading after a switch.",
+      "Method: the decadal source-region δ¹⁸O anomaly of each forcing (−35 ‰ end-member; the forcing of Endres et al., in prep.) is convolved with the HadCM3 surface response to a 10-yr dye pulse in each region, A(t) = Σₖ F(t − k) · h(k). The 50 decadal responses add up to the constant-input equilibrium, so a steady forcing reaches the site weights of Endres et al. (2026b). The mixed pathway switches the AMOC mode on a fixed schedule; water released under one mode keeps spreading after a switch.",
       "Pulse runs: xpran (cold), xprao (zonal), xpujc (meridional), each after 10 yr of its constant-input parent run. The meridional pulse branches from xpram, not from the paper's meridional run xpral; it is used only in the mixed pathway, 14.7–13.7 ka.",
       `Kernels: ${DATA.kernels}. Built from pipeline commit ${DATA.run.git_commit || "?"} on ${DATA.run.created || "?"}. Regions and sites: Endres et al. (2026b). Coastline: Natural Earth 110 m.`,
     ];
