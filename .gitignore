@@ -1,2 +1,6 @@
 .DS_Store
 .Rproj.user
+
+# Pulse-kernel bundle exported on the Leeds server (large; see data/kernels/README.md)
+data/kernels/*
+!data/kernels/README.md

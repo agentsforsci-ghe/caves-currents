@@ -1,0 +1,12 @@
+---
+id: 2026-09-30-001-build-v2-app-with-real-convolution
+timestamp: 2026-09-30T20:40:50+02:00
+model: claude-opus-5-5
+files_touched:
+  - .gitignore
+  - data/kernels/README.md
+  - plans/2026-09-30-v2-convolution-explorer-plan.md
+  - scripts/export_pulse_kernels.py
+---
+
+I want to build now on what we did, we build a v2 of what we had. Let's start with the app, but make sure that the scripts are versatile enough to use them also for another quarto report. For the app now  use the real region shape file, they are in the repo of the meltmodel paper, here: /Users/lendres/Documents/gitrepos/gh-lrndrs/gh-lrndrs-dyetracer_palaeo_figurescripts . Use this repo's code anyway as a way of how i want the code organized and how I used the impulse response, the trajectories and time series from different sites to predict a surface anoamly. I want to expand what was done in the app: the globe on the left should now show as you suggested the real region shape, it is also available in the meltmodel repo. then the surface ocean should represent how the anomalies spread over time, so it is an animation of what is computed as slices in the convolution script (folder old scripts), where the time slices are computed for every 1000 year. This should be done for the two AMOC modes separately, and as well for the mixed pathway as is also outlined in the convolution script. On the right side, just show the resulting anomaly time series, you can take away the speleothem data for now. ButtThe script that is now written should be so versatile that it can be computed for all 6 sites from the meltmodel script, and you can select the different sites to look at the anomaly time series. so use the trajectory file for the land sites, and only the location for the ocean sites - like I did in the meltmodel scripts, you can use these files. but the goal is that one can switch between these 6 locations on the right side of the screen, and look at evolution over time. a seventh option is also to  keep the discharge series itself. the forcing for now is either Glac-1D or ICE-6G. But in the future other forcing time series should be imagined, so the code should be able to handle other input series.  if this works well, I would like to have the SPIDER figures you did for all 6 locations (comparing the two reconstructions). and a layman's explanation of the five parameter you have chosen for the comparison and how they are computed (SD,Dominance,Var, etc.).
