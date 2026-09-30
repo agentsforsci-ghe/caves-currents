@@ -39,3 +39,25 @@ Leeds server with `scripts/export_pulse_kernels.py`, then copy them here.
 
 The file attributes record the experiment IDs, the pulse design and the
 creation date.
+
+## Caveat: the merid pulse has a different parent run
+
+The cold and zonal pulse runs branch from the paper's constant-input runs
+for 17.8 ka (xpraj and xprak, as listed in the meltmodel `EXPERIMENTS.py`).
+The merid pulse run xpujc does **not**. It branches from **xpram**, which
+starts in 4511, while xpujc starts in 4521. The paper's merid 17.8 ka run is
+**xpral**, which starts in 6381. xpram does not appear in the meltmodel
+`EXPERIMENTS.py`. This was established from the time axes on the Leeds
+server on 2026-09-30.
+
+Consequences:
+
+- The merid kernel's background climate is xpram's, not that of the merid
+  equilibrium field used in Endres et al. (2026b). Before relying on the
+  merid kernel, check which boundary conditions and AMOC state xpram has.
+- The scaling check cannot test merid against the paper's weights:
+  `data/meltmodel_site_weights.csv` has only the cold and zonal modes. The
+  nearest reference is the meltmodel `mean_dye_merid.nc`, which comes from
+  the paper's merid runs, not from xpram. A mismatch there may be real.
+- The merid kernel is used only in the **mixed** pathway, for 14.7–13.7 ka.
+  The cold and zonal pathways do not depend on it.

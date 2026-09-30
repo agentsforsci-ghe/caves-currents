@@ -110,7 +110,7 @@ R/         site_metrics.R           five metrics + spider plot, sourced by any .
 ## Verification
 
 1. The export script runs on a synthetic dataset. Laura then runs it on Leeds, and the bundle's dimensions and attributes are checked on arrival.
-2. The scaling check passes within a few percent. If not, stop and ask.
+2. The scaling check passes within a few percent for cold and zonal. If not, stop and ask. Merid has no paper weights. Compare it with `mean_dye_merid.nc` and report the ratio, but a mismatch may be real, because its parent xpram is not the paper's merid run xpral.
 3. The mixed pathway is continuous at the boundaries, with no step caused by dropped tails. MWP-1A timing in the Discharge view still peaks at 0.260 Sv at 14.4 ka and 0.243 Sv at 14.0 ka.
 4. The app is served with `python3 -m http.server 8765 --bind 127.0.0.1` from `app/` and tested in Chrome:
    - all toggles work and play animates the slices;
