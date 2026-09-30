@@ -5,7 +5,9 @@ Turn the decadal surface fields into compact frames for the explorer app.
 Reads outputs/convolution[/placeholder]/fields/field_<forcing>_<pathway>.nc
 (written by run_convolution.py) and writes, into app/frames/:
 
-    <forcing>_<pathway>.bin   uint8, frame-major: n_frames x n_cells
+    <forcing>_<pathway>.txt   uint8 frames (frame-major: n_frames x n_cells),
+                              gzip-compressed and base64-encoded, because
+                              claude.ai artifacts serve text but not raw binary
     meta.json                 cell centres, frame ages, colour-scale limits,
                               kernel source and the placeholder flag
 
@@ -21,6 +23,8 @@ Run from the repository root after run_convolution.py:
 """
 
 import argparse
+import base64
+import gzip
 import json
 import sys
 from pathlib import Path
@@ -68,8 +72,8 @@ def main():
     lon = first.longitude.values[ix]
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for old_bin in OUT.glob("*.bin"):
-        old_bin.unlink()
+    for old in list(OUT.glob("*.bin")) + list(OUT.glob("*.txt")):
+        old.unlink()
     span = np.log(vmax / VMIN)
     sizes = {}
     for (forcing, pathway), da in fields.items():
@@ -77,14 +81,15 @@ def main():
         q = np.zeros(mag.shape, np.uint8)
         on = mag >= VMIN
         q[on] = np.minimum(255, 1 + np.rint(254 * np.log(mag[on] / VMIN) / span)).astype(np.uint8)
-        path = OUT / f"{forcing}_{pathway}.bin"
-        path.write_bytes(q.tobytes())
+        path = OUT / f"{forcing}_{pathway}.txt"
+        path.write_bytes(base64.b64encode(gzip.compress(q.tobytes(), compresslevel=9, mtime=0)))
         sizes[path.name] = path.stat().st_size
 
     meta = {
         "cells": {"lat": [round(float(a), 3) for a in lat], "lon": [round(float(a), 3) for a in lon], "d": 1.25},
         "ages": [int(a) for a in first.time_bp.values],
-        "files": {f"{fo}_{pw}": f"frames/{fo}_{pw}.bin" for fo, pw in fields},
+        "files": {f"{fo}_{pw}": f"frames/{fo}_{pw}.txt" for fo, pw in fields},
+        "encoding": "gzip+base64",
         "scale": {"vmin": VMIN, "vmax": round(vmax, 4), "levels": 255, "type": "log"},
         "placeholder": bool(info["placeholder"]),
         "kernels": info["kernels"],
@@ -94,7 +99,7 @@ def main():
     (OUT / "meta.json").write_text(json.dumps(meta, separators=(",", ":")))
     n_frames, n_cells = len(meta["ages"]), len(lat)
     print(f"{len(fields)} files, {n_frames} frames x {n_cells} cells, "
-          f"{max(sizes.values()) / 1e6:.1f} MB each, scale {VMIN}-{vmax:.2f} per mil"
+          f"{max(sizes.values()) / 1e6:.1f} MB each (gzip+base64), scale {VMIN}-{vmax:.2f} per mil"
           + ("  [PLACEHOLDER kernels]" if meta["placeholder"] else ""))
 
 

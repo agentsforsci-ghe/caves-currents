@@ -297,7 +297,10 @@ const DATA = /*__DATA__*/null;
   function loadFrames(key) {
     if (cache.has(key)) return Promise.resolve(cache.get(key));
     if (pending.has(key)) return pending.get(key);
-    const p = fetch(FR.files[key]).then(r => { if (!r.ok) throw new Error(r.status + " " + r.statusText); return r.arrayBuffer(); })
+    // Frames are gzip + base64 text (artifacts serve text, not raw binary).
+    const p = fetch(FR.files[key]).then(r => { if (!r.ok) throw new Error(r.status + " " + r.statusText); return r.text(); })
+      .then(t => { const bin = atob(t.trim()); const z = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) z[i] = bin.charCodeAt(i);
+        return new Response(new Blob([z]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(); })
       .then(b => { const u = new Uint8Array(b); if (u.length !== AGES.length * NCELL) throw new Error("unexpected file size"); cache.set(key, u); pending.delete(key); return u; })
       .catch(e => { pending.delete(key); throw e; });
     pending.set(key, p);

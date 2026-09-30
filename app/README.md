@@ -18,7 +18,8 @@ freshwater goes:
   discharge itself.
 
 The shared page is https://claude.ai/artifact/HMQMC2ACsbpvvDQNyRgcPG, which is
-private until shared. It still shows v1 until the real kernels are in.
+private until shared. It shows v2 on the real HadCM3 kernels (published
+2026-09-30).
 
 ## Build
 
@@ -47,8 +48,8 @@ Do not commit a page built from placeholder outputs.
 
 **Publishing.** Run `python3 app/build_app.py --publish-out <path>`, then
 republish that file to the same artifact URL to keep the link. Pass the six
-`frames/<forcing>_<pathway>.bin` files as the artifact's `files`, each about
-5 MB. The build prints the mapping.
+`frames/<forcing>_<pathway>.txt` files as the artifact's `files`. They are
+gzip + base64 text, because artifacts do not serve raw binary. The build prints the mapping.
 
 ## Files
 

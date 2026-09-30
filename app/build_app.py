@@ -9,7 +9,7 @@ regional discharge itself.
 
 Inputs (made by the pipeline; see CLAUDE.md):
   outputs/convolution[/placeholder]/site_anomaly.csv.gz, run_info.json
-  app/frames/meta.json and app/frames/*.bin   (scripts/export_app_frames.py)
+  app/frames/meta.json and app/frames/*.txt   (scripts/export_app_frames.py)
   app/regions_hadcm3.geojson                  (scripts/make_region_geojson.py)
   data/Discharge_*.csv, myconfig/SITES.py, myconfig/PATHWAYS.py
   scripts/make_forward_model_schematic.py     ("How the model works" panel)
