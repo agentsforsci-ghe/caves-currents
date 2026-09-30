@@ -57,13 +57,14 @@ warnings.filterwarnings("ignore", category=xr.SerializationWarning)
 # constant-input run, and are prepended (notebook cell 2).
 #   cold : xpran after xpraj 5681-5690
 #   zonal: xprao after xprak 5101-5110
-#   merid: xpujc after xpral  <- TO CONFIRM. The notebook takes these years
-#          from 'xpram', which it never loads, so the merid pulse was skipped
-#          there. xpral is the merid constant run (EXPERIMENTS.py, 17.8k).
+#   merid: xpujc after xpram 4511-4520. The notebook names xpram but never
+#          loads it (and slices the wrong years), so its merid pulse was
+#          skipped. Confirmed from the time axes: xpram runs 4511-5010,
+#          xpujc starts 4521. xpram is not the paper's merid run (xpral).
 PULSE_EXPERIMENTS = {
     "cold": {"pulse": "xpran", "parent": "xpraj"},
     "zonal": {"pulse": "xprao", "parent": "xprak"},
-    "merid": {"pulse": "xpujc", "parent": "xpral"},
+    "merid": {"pulse": "xpujc", "parent": "xpram"},
 }
 
 # Same layout as mymodules/dyefield_computation.py in the meltmodel repo:

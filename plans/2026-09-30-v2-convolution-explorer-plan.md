@@ -20,8 +20,8 @@ Decisions made:
 
 - **Config block at the top.** It is pre-filled from `old script/Create_impulsets.ipynb`:
   - pulse runs xpran (cold), xprao (zonal) and xpujc (merid);
-  - each pulse run starts after its 10-yr pulse, so the first 10 yr of the parent constant run (xpraj, xprak, xpral) are prepended;
-  - the merid parent is to be confirmed, because the notebook names an unloaded `xpram`;
+  - each pulse run starts after its 10-yr pulse, so the first 10 yr of the parent constant run (xpraj, xprak, xpram) are prepended;
+  - the merid parent is xpram (4511–4520), confirmed from the time axes on 2026-09-30;
   - `BASE_DIR = /nfs/annie/earpal/database/experiments`;
   - `PULSE_YEARS = 10`.
   - A time-axis continuity check warns if a pulse run does not start the year after its prepended years.

@@ -14,7 +14,7 @@ Leeds server with `scripts/export_pulse_kernels.py`, then copy them here.
    |---|---|---|
    | cold | xpran | xpraj, years 5681–5690 |
    | zonal | xprao | xprak, years 5101–5110 |
-   | merid | xpujc | xpral, **to confirm**: the notebook names `xpram`, which it never loads |
+   | merid | xpujc | xpram, years 4511–4520 (checked from the time axes; the notebook named xpram but never loaded it) |
 
    Each pulse run starts *after* its 10-yr pulse, so the script prepends the
    first 10 years of the parent constant-input run, as the notebook did.

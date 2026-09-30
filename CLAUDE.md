@@ -65,7 +65,7 @@ R 4.6 is installed with readr, dplyr, tidyr, purrr, ggplot2, patchwork, struccha
 - **Anomaly columns** (`<code> d18O (-30/-35/-40)`) hold the *source-region* δ¹⁸O anomaly, which is linear in discharge. They are the forcing that the forward-model draft convolves, not the anomaly at NISA. Use the −35 ‰ end-member; the others only rescale everything by 6/7 or 8/7. Endres et al. (2026b) use a saturating mixing fraction instead, so their scenario values are smaller for large pulses.
 - **Site anomalies (v1).** Multiply source anomalies by `meltmodel_site_weights.csv` (site × region × AMOC mode, cold or zonal). This is an *equilibrium* approximation: it has no transit delay and overstates short pulses, so always say so.
 - **Site anomalies (v2).** Convolve the decadal forcing with the pulse kernels: `A(t) = Σ_k 10·F(t−k)·h(k)`, as in the 2025.05 notebook (`old script/`).
-  - The pulse runs are xpran (cold), xprao (zonal) and xpujc (merid). Each starts after its 10-yr pulse, so the export prepends the parent run's first 10 yr (xpraj, xprak, xpral). The merid parent still needs confirming.
+  - The pulse runs are xpran (cold), xprao (zonal) and xpujc (merid). Each starts after its 10-yr pulse, so the export prepends the parent run's first 10 yr (xpraj, xprak, xpram). xpram was confirmed from the time axes: it starts in 4511 and xpujc in 4521.
   - The mixed pathway switches modes on the notebook's schedule. Its first and last modes extend to the ends of the forcing, which gives a spin-up.
   - Land sites use the trajectory uptake fields. The merid segment borrows the zonal uptake, because there is no merid trajectory run.
   - `scaling_check.csv` compares the 500-yr step response with the equilibrium weights, and should be about 1.
