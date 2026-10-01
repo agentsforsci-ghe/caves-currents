@@ -61,21 +61,23 @@ quarto render site_anomalies_v2.qmd         # the v2 report (about 10 s)
 python3 scripts/make_spider_slides.py --out <folder>   # the three spider slides
 ```
 
-The pulse-kernel bundle in `data/kernels/` is not in git. Without it,
-`run_convolution.py` uses a clearly flagged placeholder that must never be
-reported.
+Generated model data is not in git: the pulse-kernel bundle in
+`data/kernels/`, `data/meltmodel/` and `outputs/`. A fresh clone runs the
+commands above to rebuild them; this needs the meltmodel repo data and the
+kernel bundle. Without the bundle, `run_convolution.py` uses a clearly
+flagged placeholder that must never be reported.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `data/` | SISAL-format Glas data, the two discharge series, the meltmodel site weights, the land-site uptake weights and the kernel README |
+| `data/` | SISAL-format Glas data, the two discharge series, the meltmodel site weights and the kernel README. Not in git: `data/kernels/` (the kernel bundle from Leeds) and `data/meltmodel/` (made by `make_uptake_weights.py`) |
 | `myconfig/` | Dyes and colours, sites, forcings, pathways, paths. A new forcing or site is one entry |
 | `mymodules/` | Forcing loader, site extraction, kernels, convolution |
 | `scripts/` | Pipeline steps, the Leeds export, the schematic and slide generators |
 | `R/site_metrics.R` | The five site metrics and spider plots, reusable from any report |
 | `app/` | The explorer (see `app/README.md`) |
-| `outputs/convolution/` | Site series, scaling check and run info. The large field files are not in git |
+| `outputs/convolution/` | Site series, scaling check, validation and run info. Not in git; made by `run_convolution.py` |
 | `plans/`, `prompts/` | Plans written before large tasks, and the archive of prompts behind Claude-assisted commits |
 
 ## Sources

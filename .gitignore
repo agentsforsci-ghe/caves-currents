@@ -5,9 +5,10 @@
 data/kernels/*
 !data/kernels/README.md
 
-# Convolution outputs: surface fields are large; placeholder runs must never be committed
-outputs/convolution/fields/
-outputs/convolution/placeholder/
+# Generated model data stays out of git (Laura, 2026-10-01). Rebuild with
+# scripts/make_uptake_weights.py and scripts/run_convolution.py (see README.md).
+data/meltmodel/
+outputs/
 __pycache__/
 
 # Generated app frames (large; rebuilt by scripts/export_app_frames.py)

@@ -140,6 +140,7 @@ Where the build differs from the plan above:
     - a "How the model works" panel (`scripts/make_forward_model_schematic.py`);
     - a ×1 | ×10 forcing-factor switch, then set to ×1 only after the validation.
   - Live at https://claude.ai/artifact/HMQMC2ACsbpvvDQNyRgcPG.
+- **Outputs are not in git** (Laura, 2026-10-01): `data/meltmodel/` and `outputs/` were taken out of the unpushed commits before the first push. The plan above had them committed.
 - **Step 4.**
   - `site_anomalies_v2.qmd` has one spider figure per site, the mixed pathway only, and a table for the pathway sensitivity.
   - Window: 21.5–10 ka.

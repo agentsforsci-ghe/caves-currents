@@ -23,10 +23,14 @@ is Laura Endres.
   - `myconfig/`: dyes and colours, sites, forcings, pathways and paths.
   - `mymodules/`: the forcing loader, site extraction, kernels and the convolution.
   - `scripts/`: `export_pulse_kernels.py` (runs on the Leeds server), `make_uptake_weights.py`, `make_region_geojson.py` and `run_convolution.py`.
-  - Outputs go to `outputs/convolution/`.
+  - Outputs go to `outputs/convolution/`. That folder is **not in git**; rebuild it with `run_convolution.py`.
   - New forcings are one entry in `myconfig/FORCINGS.py`, and new sites one entry in `myconfig/SITES.py`.
 - `R/site_metrics.R`: reusable R helpers for any report. They read `outputs/convolution/site_anomaly.csv.gz`, average it onto a 500-yr grid, compute the five metrics (share, dominance, SD, variance share, SD of changes) and draw one site's spider figure.
 - `data/kernels/`: the HadCM3 pulse-kernel bundle. It is **untracked** (see its README for how to make it). `data/meltmodel/uptake_weights.nc` holds the land-site moisture-uptake fields regridded from the trajectories.
+- **Not in git** (Laura, 2026-10-01): `data/kernels/` (except its README), `data/meltmodel/` and `outputs/`. They are generated model data.
+  - A fresh clone rebuilds them with `make_uptake_weights.py` (needs the meltmodel repo data) and `run_convolution.py` (needs the kernel bundle from Leeds).
+  - `site_anomalies_v2.qmd`, the app build and the slide generator need these outputs. The rendered `site_anomalies_v2.docx` and `app/discharge_explorer.html` are committed.
+  - Never commit these files, and never add them back with `git add -f`.
 - `plans/`: plans written before large tasks, dated.
 - `prompts/`: verbatim prompt archive written by the commit skill (`YYYY-MM-DD-NNN-slug.md`).
 - `Impulse_Response_Revisions_v1.pdf`: unpublished forward-model draft (Endres et al., in prep.). It is deliberately **untracked**, so never commit it. The same goes for Word lock files (`~$*.docx`).
