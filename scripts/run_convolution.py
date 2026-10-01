@@ -11,8 +11,9 @@ Outputs (in outputs/convolution/, or outputs/convolution/placeholder/ when
 the placeholder kernels are used):
     site_anomaly.csv.gz   forcing, pathway, site, time_bp, one column per
                           region code, total  (per mil)
-    scaling_check.csv     500-yr constant-input response vs the equilibrium
-                          weights in data/meltmodel_site_weights.csv
+    scaling_check.csv     sum of the 50 decadal pulse responses (the kernel
+                          alone, without --scale) vs the equilibrium weights
+                          in data/meltmodel_site_weights.csv; about 1
     fields/field_<forcing>_<pathway>.nc
                           total anomaly (time_bp, latitude, longitude) over
                           FIELD_DOMAIN; large, not in git
@@ -30,7 +31,6 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -56,8 +56,10 @@ def crop_domain(field, dom):
 
 
 def scaling_check(points):
-    """Response at 500 yr to a constant unit input, per site/mode/region."""
-    step = (SCALE * points.sum("lag")).to_dataframe(name="response_500yr").reset_index()
+    """Sum of the decadal pulse responses (the kernel alone, no scale factor),
+    per site/mode/region. About 1 times the equilibrium weight if the kernels
+    add up to the constant-input equilibrium."""
+    step = points.sum("lag").to_dataframe(name="response_500yr").reset_index()
     step["region"] = step["dye"].map(dict(zip([f"dye{i:02d}" for i in range(9)],
                                               [CODE_TO_REGION[c] for c in CODES])))
     ref = pd.read_csv(SITE_WEIGHTS).rename(columns={"amoc_mode": "mode", "weight": "equilibrium_weight"})
@@ -80,6 +82,8 @@ def main():
     ap.add_argument("--forcing", nargs="+", default=list(FORCINGS), help="keys of FORCINGS")
     ap.add_argument("--pathway", nargs="+", default=list(PATHWAYS))
     ap.add_argument("--no-fields", action="store_true", help="skip the surface fields")
+    ap.add_argument("--scale", type=float, default=SCALE,
+                    help=f"factor on the decadal forcing (default {SCALE:g}; under review, see mymodules/convolution.py)")
     ap.add_argument("--field-window", nargs=2, type=int, default=[23000, 9000],
                     metavar=("OLDEST_BP", "YOUNGEST_BP"), help="years BP kept in the field files")
     args = ap.parse_args()
@@ -97,7 +101,8 @@ def main():
     chk = scaling_check(points)
     chk.to_csv(outdir / "scaling_check.csv", index=False)
     r = chk["ratio"].dropna()
-    print(f"Scaling check: response/equilibrium ratio median {r.median():.4f}, "
+    print(f"Scale factor on the forcing: {args.scale:g}")
+    print(f"Scaling check (kernel alone): response/equilibrium ratio median {r.median():.4f}, "
           f"range {r.min():.4f}-{r.max():.4f} over {len(r)} site-mode-region cells")
 
     rows = []
@@ -105,7 +110,7 @@ def main():
         F = load_forcing(fk)
         for pw in args.pathway:
             for site in SITES:
-                A = convolve_series(F, points.sel(site=site), pw)
+                A = convolve_series(F, points.sel(site=site), pw, scale=args.scale)
                 df = pd.DataFrame(A, columns=CODES)
                 df.insert(0, "time_bp", -F.index.to_numpy())
                 df.insert(0, "site", site)
@@ -131,7 +136,7 @@ def main():
             bp = -F.index.to_numpy()
             keep = (bp <= old) & (bp >= young)
             for pw in args.pathway:
-                tot = convolve_field(F, kf, pw, keep=keep).astype("float32")
+                tot = convolve_field(F, kf, pw, keep=keep, scale=args.scale).astype("float32")
                 da = xr.DataArray(tot, dims=("time_bp", "latitude", "longitude"),
                                   coords={"time_bp": bp[keep], "latitude": kf.latitude.values,
                                           "longitude": kf.longitude.values},
@@ -151,7 +156,7 @@ def main():
         "forcings": {k: FORCINGS[k]["label"] for k in args.forcing},
         "pathways": {k: PATHWAYS[k] for k in args.pathway},
         "sites": list(SITES),
-        "scale": SCALE,
+        "scale": args.scale,
         "field_window_bp": args.field_window,
         "field_domain": FIELD_DOMAIN,
         "field_files": field_files,

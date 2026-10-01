@@ -53,8 +53,10 @@ Convolution pipeline (needs the conda `base` Python with xarray and scipy; about
 python3 scripts/make_uptake_weights.py      # once: trajectories -> data/meltmodel/uptake_weights.nc
 python3 scripts/make_region_geojson.py      # once: HadCM3 input cells -> app/regions_hadcm3.geojson
 python3 scripts/run_convolution.py          # uses data/kernels/ if present, else the placeholder
-python3 scripts/export_app_frames.py        # decadal fields -> app/frames/ (8-bit, about 5 MB per forcing x pathway)
+python3 scripts/export_app_frames.py        # decadal fields -> app/frames/ (8-bit, gzip+base64 text, about 1.5-2.3 MB per file)
 python3 scripts/make_forward_model_schematic.py --out <path>   # standalone forward-model schematic (also inlined in the app)
+python3 scripts/make_spider_slides.py --out <folder>          # the three spider slides (needs Rscript)
+/Applications/RStudio.app/Contents/Resources/app/quarto/bin/quarto render site_anomalies_v2.qmd   # about 10 s
 ```
 
 Without the kernel bundle, `run_convolution.py` falls back to a **placeholder**: the equilibrium field spread over time with an invented 100-yr response time. Its outputs go to `outputs/convolution/placeholder/`, which is gitignored. Never report, commit or publish them as results.
@@ -68,12 +70,27 @@ R 4.6 is installed with readr, dplyr, tidyr, purrr, ggplot2, patchwork, struccha
 - **Region codes** in file order are `Med, Bri, Fen, EurArc, AmeArc, GIS, NLau, SLau, GulofMex`. They map one to one onto Endres et al. (2026b) names: `EIS_MedSea, EIS_BayOfBiscay, EIS_NorwegianSea, EIS_Arctic, LAU_Arctic, GIS_GreenlandSea, LAU_LabradorSea, LAU_StLawrence, LAU_GulfOfMexico`. `LAU_Arctic` drains to the Beaufort Sea.
 - **Anomaly columns** (`<code> d18O (-30/-35/-40)`) hold the *source-region* δ¹⁸O anomaly, which is linear in discharge. They are the forcing that the forward-model draft convolves, not the anomaly at NISA. Use the −35 ‰ end-member; the others only rescale everything by 6/7 or 8/7. Endres et al. (2026b) use a saturating mixing fraction instead, so their scenario values are smaller for large pulses.
 - **Site anomalies (v1).** Multiply source anomalies by `meltmodel_site_weights.csv` (site × region × AMOC mode, cold or zonal). This is an *equilibrium* approximation: it has no transit delay and overstates short pulses, so always say so.
-- **Site anomalies (v2).** Convolve the decadal forcing with the pulse kernels: `A(t) = Σ_k F(t−k)·h(k)`, with **no ×10**. The 2025.05 notebook (`old script/`) multiplied F by 10 in its deglacial cells. On 2026-09-30 Laura chose to drop that, because the 50 decadal pulse responses already add up to the equilibrium. That holds for cold and zonal at all 9 sites (0.85–1.16) and in the notebook's own constant runs. Without the factor, a steady forcing reaches the paper's equilibrium weights.
+- **Site anomalies (v2).** Convolve the decadal forcing with the pulse kernels: `A(t) = Σ_k c·F(t−k)·h(k)`.
+  - **Pipeline and reports:** c = 1.
+  - **Explorer:** a switch between ×1 and ×10, default ×10. The model is linear, so the page applies the factor exactly.
+  - **The factor is an open question; see "Open questions" below.**
   - The pulse runs are xpran (cold), xprao (zonal) and xpujc (merid). Each starts after its 10-yr pulse, so the export prepends the parent run's first 10 yr (xpraj, xprak, xpram). xpram was confirmed from the time axes: it starts in 4511 and xpujc in 4521. xpram is **not** the paper's merid run (xpral), so the merid kernel has a different parent climate. The merid kernel only affects the mixed pathway, at 14.7–13.7 ka; mention this whenever you use it (see `data/kernels/README.md`).
   - The mixed pathway switches modes on the notebook's schedule. Its first and last modes extend to the ends of the forcing, which gives a spin-up.
   - Land sites use the trajectory uptake fields. The merid segment borrows the zonal uptake, because there is no merid trajectory run.
   - `scaling_check.csv` compares the 500-yr step response with the equilibrium weights, and should be about 1.
 - **Published abrupt Glas events** (Endres et al. 2026a, Table 1) are hard-coded in both `nisa_meltwater_sources.qmd` and `app/build_app.py`. Define events by sample **depth**, so that they are re-dated in every age-model ensemble member.
+
+## Open questions
+
+- **The forcing factor (×1 or ×10) needs a detailed review** (raised 2026-10-01).
+  - **For ×10:** the 2025.05 notebook used it, and Laura's reasoning is that the forcing is entered per year while the pulse was 10 years at 1 normalised unit per year.
+  - **Against:**
+    - The 50 decadal pulse responses already add up to the constant-input equilibrium: 0.85–1.16 per site for cold and zonal, and the notebook's own constant runs agree.
+    - The source-region dye decays smoothly from the parent's pulse decade into the pulse run, with no 10× jump.
+    - With ×10, the surface anomaly near the sources reaches about −44 ‰, more negative than the −35 ‰ meltwater end-member itself. With ×1 the maximum is about −4.4 ‰.
+  - **What does not depend on the factor:** shares, dominance, variance shares and the spider shapes.
+  - **What scales with it:** anomaly values, SDs and the map colours.
+  - The pipeline (`--scale`), the explorer switch and `mymodules/convolution.py` all document this.
 
 ## Analysis standards (question 2)
 
@@ -96,7 +113,13 @@ The design was reviewed from Kira Rehfeld's perspective: irregular, age-uncertai
 
 ## Colours
 
-The region colours match the paper figures (matplotlib tab10), with lightness tuned to pass colour-blindness checks. They are defined in **two places that must stay in sync**: `reg_col` in `nisa_meltwater_sources.qmd` and the `--r-*` tokens in `app/template.html`.
+The region colours match the paper figures (matplotlib tab10), with lightness tuned to pass colour-blindness checks. They are defined in **four places that must stay in sync**:
+- `reg_col` in `nisa_meltwater_sources.qmd`;
+- `reg_col` in `R/site_metrics.R`, used by `site_anomalies_v2.qmd`;
+- the `--r-*` tokens in `app/template.html`;
+- `TOKENS_CSS` in `scripts/make_forward_model_schematic.py`.
+
+`myconfig/DYES.py` also lists them for the Python side. The two reconstructions have their own pair: GLAC-1D `#184f95` and ICE-6G `#c26a00`, in the report and the slides.
 
 | Region | Light | Dark (app only) |
 |---|---|---|
@@ -115,16 +138,21 @@ Stacked charts use this bottom-to-top order, which keeps neighbouring colours di
 ## Explorer app
 
 - `discharge_explorer.html` is generated, so edit `template.html` or `build_app.py` and rebuild.
-- **v2** reads the pipeline outputs. The map frames are fetched from `app/frames/`, so test over http, not `file://`. `build_app.py --publish-out` refuses placeholder outputs, and a page built from them must not be committed. Publish the six `frames/*.txt` as artifact `files`. They are gzip + base64 text, because artifacts reject binary.
-- The "How the model works" panel is `scripts/make_forward_model_schematic.py`, inlined by `build_app.py`. Its classes and SVG ids carry an `fm-` prefix, so it can't clash with the app's styles. Keep it that way. Its standalone copy is https://claude.ai/artifact/CqfLtTKp2MCwDi9L8YFa6x; republish the `--out` file to the same URL. Only the forcing panel shows real data. Once the kernels arrive, the pulse-response curves can use the real ones.
+- **v2** reads the pipeline outputs. The map frames are fetched from `app/frames/`, so test over http, not `file://`. `build_app.py --publish-out` refuses placeholder outputs, and a page built from them must not be committed. Publish all nine `frames/*.txt` (six anomaly files, one per forcing and pathway, and three GLAC-1D − ICE-6G difference files, one per pathway) as artifact `files`. They are gzip + base64 text, because artifacts reject binary.
+- The "How the model works" panel is `scripts/make_forward_model_schematic.py`, inlined by `build_app.py`. Its classes and SVG ids carry an `fm-` prefix, so it can't clash with the app's styles. Keep it that way. Its standalone copy is https://claude.ai/artifact/CqfLtTKp2MCwDi9L8YFa6x; republish the `--out` file to the same URL. Only the forcing panel shows real data. The kernels are in, so the pulse-response curves (step 2) could now use the real NISA responses.
 - **Globe colour maps** (Laura's choice, 2026-09-30):
   - Crameri `hawaii` for anomaly size and `vik` for the GLAC-1D − ICE-6G difference view.
   - The stops are sampled from `cmcrameri` in the `dyetracer` conda env and stored as `--cm-*` / `--dv-*` tokens.
   - These are field colours, separate from the region palette.
 - In the Chrome automation tab, `requestAnimationFrame` does not run, because the tab reports itself as hidden. To test playback there, replace it with a `setTimeout` stand-in.
-- `regions_approx.geojson` holds hand-digitised, approximate outlines from Endres et al. (2026b, Fig. 2a). Exact HadCM3 masks with the same `code` property can replace it without code changes.
+- The globe draws `regions_hadcm3.geojson`, the exact HadCM3 input cells. `regions_approx.geojson`, the v1 hand-digitised outlines, is now only read for region names and drainage notes.
 - The shared page is https://claude.ai/artifact/HMQMC2ACsbpvvDQNyRgcPG, which is private until shared. Republish the `--publish-out` copy to the same URL to keep the link.
 - The browser tools cannot open `file://`. To test locally, serve the folder with `python3 -m http.server 8765 --bind 127.0.0.1` from `app/` and stop the server afterwards.
+
+## Slides
+
+- The spider slides are the Slides-type artifact https://claude.ai/artifact/TeDmKyFH5oj1oW9dpwhAEW (private until shared; downloads as PowerPoint or PDF). There are three slides: how to read a spider, the nine NISA spiders, and the takeaways.
+- `scripts/make_spider_slides.py` writes them from the convolution outputs through `R/site_metrics.R`, so the numbers follow the data. To update the deck, republish the three `project/slides/*.html` files to the same URL with `root` set to the `--out` folder. Leave `deck.json` alone unless slides are added or removed (`--index`).
 
 ## Git workflow
 

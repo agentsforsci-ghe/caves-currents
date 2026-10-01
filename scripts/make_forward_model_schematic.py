@@ -365,7 +365,23 @@ LEDE = ("The forward model has five steps. A reconstruction gives the meltwater 
         "read at the core or cave.")
 
 
+def scale_factor():
+    """The factor on the forcing used by the last pipeline run (outputs/convolution/run_info.json)."""
+    try:
+        import json
+        return float(json.loads((REPO / "outputs/convolution/run_info.json").read_text())["scale"])
+    except (OSError, KeyError, ValueError):
+        return 1.0
+
+
 def body():
+    s = scale_factor()
+    sc = f"{s:g} · " if s != 1 else ""
+    note = (f" The forcing is multiplied by {s:g} (one decade of a per-year forcing, as in the 2025.05 notebook); "
+            "this factor is under review, because the 50 decadal responses already add up to the equilibrium."
+            if s != 1 else
+            " The explorer can also multiply the forcing by 10 (one decade of a per-year forcing, as in the 2025.05 "
+            "notebook); that factor is under review, because the 50 decadal responses already add up to the equilibrium.")
     return f"""<div class="stages">
     <figure class="stage">
       <h2><span class="n">1</span>Forcing</h2>
@@ -388,7 +404,7 @@ def body():
       {panel_convolution()}
       <figcaption>
         <span>Each decade of forcing launches a copy of the pulse response, scaled by its size. The copies overlap and add up. A short pulse arrives late and spread out, and a long input builds up to its equilibrium.</span>
-        <span class="eq">A<sub>r</sub>(x, t) = Σ<sub>k</sub> F<sub>r</sub>(t − k) · h<sub>r</sub>(x, k)</span>
+        <span class="eq">A<sub>r</sub>(x, t) = Σ<sub>k</sub> {sc}F<sub>r</sub>(t − k) · h<sub>r</sub>(x, k)</span>
       </figcaption>
     </figure>
     <figure class="stage wide">
@@ -408,7 +424,7 @@ def body():
   </div>
   <section class="chain" aria-label="The whole chain in one equation">
     <h2>The whole chain</h2>
-    <div class="big">A<sub>site</sub>(t) = Σ<sub>r</sub> Σ<sub>x</sub> w<sub>site</sub>(x) · Σ<sub>k</sub> F<sub>r</sub>(t − k) · h<sub>r, m(t−k)</sub>(x, k)</div>
+    <div class="big">A<sub>site</sub>(t) = Σ<sub>r</sub> Σ<sub>x</sub> w<sub>site</sub>(x) · Σ<sub>k</sub> {sc}F<sub>r</sub>(t − k) · h<sub>r, m(t−k)</sub>(x, k)</div>
     <dl class="terms">
       <div><dt>F<sub>r</sub></dt><dd>source-region δ¹⁸O anomaly of region r (step 1)</dd></div>
       <div><dt>h<sub>r,m</sub></dt><dd>surface response to a 10-yr pulse, AMOC mode m (step 2)</dd></div>
@@ -419,7 +435,7 @@ def body():
     </dl>
   </section>
   <footer class="foot">
-    <div>Assumptions: the response is linear in discharge (no saturation), the kernels come from 17.8 ka boundary conditions, and only the surface layer is used. Pulse runs: xpran (cold), xprao (zonal) and xpujc (merid), each after 10 years of its constant-input parent (xpraj, xprak, xpram). The merid parent is not the paper's merid run, xpral.</div>
+    <div>Assumptions: the response is linear in discharge (no saturation), the kernels come from 17.8 ka boundary conditions, and only the surface layer is used. Pulse runs: xpran (cold), xprao (zonal) and xpujc (merid), each after 10 years of its constant-input parent (xpraj, xprak, xpram). The merid parent is not the paper's merid run, xpral.{note}</div>
     <div>Forcing panel: GLAC-1D regional discharge, 24–8 ka, with regions in the explorer's colours. The pulse-response and pathway curves are schematic shapes, not model output.</div>
   </footer>"""
 

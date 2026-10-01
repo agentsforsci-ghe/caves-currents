@@ -297,6 +297,10 @@ spider_plot(m, "MD02-2552")
 - **Land sites.** NISA is weighted by the trajectory uptake masks. The 2025.05
   convolution notebook used a different moisture-source field, which gave a
   smaller NISA anomaly with the same timing.
+- **Forcing factor.** This report uses the forcing as it is (factor 1). The
+  2025.05 convolution notebook multiplied it by 10, and which factor is right
+  is under review. Shares, dominance, variance shares and the spider shapes
+  are the same under both; anomaly values and SDs would be ten times larger.
 - **Metrics.** The numbers describe the forward model, not the proxy
   records. Spokes are scaled per site, so a large polygon at one site cannot
   be compared in absolute terms with a large polygon at another.

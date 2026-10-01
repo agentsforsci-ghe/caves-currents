@@ -167,6 +167,9 @@ header .btn { align-self: center; }
     <div class="group"><span class="eyebrow">AMOC pathway</span>
       <div class="seg" role="group" aria-label="AMOC pathway" id="pathway-seg"></div>
     </div>
+    <div class="group"><span class="eyebrow" title="The model is linear: x10 multiplies every value by 10. Which factor is right is under review.">Forcing factor</span>
+      <div class="seg" role="group" aria-label="Forcing factor (under review)" id="factor-seg"></div>
+    </div>
     <div class="time">
       <button id="play" class="btn" type="button" aria-label="Play">Play</button>
       <label class="eyebrow" for="speed">Speed</label>
@@ -237,10 +240,12 @@ const DATA = /*__DATA__*/null;
   const DISCHARGE = "__discharge__";
   const FR = DATA.frames, AGES = FR.ages, NCELL = FR.cells.lat.length;
   const SER = DATA.series, SUNIT = SER.unit;
+  const FACTORS = DATA.factors || [1];
+  const SU = () => SUNIT * state.factor;      // series are stored at x1; the factor is applied here
   const MODE_LABEL = { cold: "Cold (weak AMOC)", zonal: "Zonal (strong AMOC)", merid: "Meridional" };
 
   const state = { forcing: FORCINGS[0], pathway: PATHWAYS.includes("mixed") ? "mixed" : PATHWAYS[0],
-    site: "La Vallina (NISA)", age: 15000, sel: null, table: false, playing: false, speed: 250, howto: false, view: "anomaly" };
+    site: "La Vallina (NISA)", age: 15000, sel: null, table: false, playing: false, speed: 250, howto: false, view: "anomaly", factor: (DATA.factors || [1]).includes(DATA.factor_default) ? DATA.factor_default : 1 };
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const colorOf = k => css("--r-" + k);
@@ -269,12 +274,17 @@ const DATA = /*__DATA__*/null;
   const isDiff = () => state.view === "diff";
   const cmap = () => d3.interpolateRgbBasis(d3.range(1, 10).map(i => css("--cm-" + i)));
   const dmap = () => d3.interpolateRgbBasis(d3.range(1, 10).map(i => css("--dv-" + i)));
+  // Frames are stored at x1. The display range covers the largest factor, so x10 looks ten times stronger.
+  const FMAX = Math.max(...FACTORS);
+  const VMAXD = SC.vmax * FMAX, DVMAXD = DSC.vmax * FMAX;
+  const apos = v => Math.max(0, Math.min(1, Math.log(v / SC.vmin) / Math.log(VMAXD / SC.vmin)));
+  const dpos = v => Math.abs(v) < DSC.vmin ? 0.5 : 0.5 + 0.5 * Math.sign(v) * Math.min(1, Math.log(Math.abs(v) / DSC.vmin) / Math.log(DVMAXD / DSC.vmin));
   let LUT = [], DLUT = [];
   function buildLut() {
-    const c = cmap(), d = dmap();
-    LUT = d3.range(256).map(q => q === 0 ? null : c((q - 1) / 254));
+    const c = cmap(), d = dmap(), f = state.factor;
+    LUT = d3.range(256).map(q => q === 0 ? null : c(apos(f * qToVal(q))));
     // position 0.5 is the neutral middle of vik; blue (GLAC-1D fresher) below, brown above
-    DLUT = d3.range(256).map(q => d(0.5 + 0.5 * Math.sign(q - 128) * (Math.abs(q - 128) / 127)));   // 128: neutral middle
+    DLUT = d3.range(256).map(q => d(dpos(f * dqToVal(q))));
   }
   function drawLegendBar() {
     const host = $("leg-ticks"), ends = $("leg-ends"); host.replaceChildren(); ends.replaceChildren();
@@ -283,15 +293,14 @@ const DATA = /*__DATA__*/null;
       const c = cmap();
       $("leg-bar").style.background = `linear-gradient(to right, ${d3.range(0, 1.001, 0.05).map(p => c(p)).join(",")})`;
       $("leg-unit").textContent = "−‰";
-      [0.01, 0.03, 0.1, 0.3, 1, 3].filter(v => v >= SC.vmin && v <= SC.vmax).forEach(v => tick(100 * Math.log(v / SC.vmin) / SPAN, v));
+      [0.01, 0.1, 1, 10].filter(v => v >= SC.vmin && v <= VMAXD).forEach(v => tick(100 * apos(v), v));
       ends.hidden = true;
       return;
     }
     const d = dmap();
     $("leg-bar").style.background = `linear-gradient(to right, ${d3.range(0, 1.001, 0.05).map(p => d(p)).join(",")})`;
     $("leg-unit").textContent = "Δ‰";
-    const pos = v => 50 + 50 * Math.sign(v) * Math.log(Math.abs(v) / DSC.vmin) / DSPAN;
-    [-1, -0.1, 0.1, 1].filter(v => Math.abs(v) >= DSC.vmin && Math.abs(v) <= DSC.vmax).forEach(v => tick(pos(v), (v > 0 ? "+" : "−") + Math.abs(v)));
+    [-10, -1, -0.1, 0.1, 1, 10].filter(v => Math.abs(v) >= DSC.vmin && Math.abs(v) <= DVMAXD).forEach(v => tick(100 * dpos(v), (v > 0 ? "+" : "−") + Math.abs(v)));
     tick(50, "0");
     ends.hidden = false;
     ends.append(el("span", "", `${DATA.forcings[DF.a].label} fresher`), el("span", "", `${DATA.forcings[DF.b].label} fresher`));
@@ -420,11 +429,12 @@ const DATA = /*__DATA__*/null;
     const box = el("div");
     box.append(el("div", "t", `${Math.abs(ll[1]).toFixed(1)}°${ll[1] >= 0 ? "N" : "S"}, ${Math.abs(ll[0]).toFixed(1)}°${ll[0] >= 0 ? "E" : "W"} · ${ka(AGES[frameIdx(state.age)])} ka`));
     if (isDiff()) {
-      const v = dqToVal(q), a = Math.abs(v);
+      const v = state.factor * dqToVal(q), a = Math.abs(v);
       box.append(row(null, `${DATA.forcings[DF.a].label} − ${DATA.forcings[DF.b].label}`, q === 128 ? "< 0.005 ‰" : `≈ ${v < 0 ? "−" : "+"}${a < 0.1 ? a.toFixed(3) : a.toFixed(2)} ‰`));
       if (q !== 128) box.append(row(null, "Fresher in", DATA.forcings[v < 0 ? DF.a : DF.b].label));
     } else {
-      box.append(row(null, "Surface δ¹⁸O anomaly", q ? `≈ −${qToVal(q) < 0.1 ? qToVal(q).toFixed(3) : qToVal(q).toFixed(2)} ‰` : "< 0.005 ‰"));
+      const v = state.factor * qToVal(q);
+      box.append(row(null, "Surface δ¹⁸O anomaly", q ? `≈ −${v < 0.1 ? v.toFixed(3) : v.toFixed(2)} ‰` : `< ${fmtA(0.005 * state.factor).replace("−", "")} ‰`));
     }
     showTip(e, box);
   });
@@ -469,7 +479,7 @@ const DATA = /*__DATA__*/null;
       return { age: f.ages[best], v: Object.fromEntries(CODES.map(c => [c, f.Q[c][best]])) };
     }
     const i = serIdx(age), n = serNode();
-    return { age: serAges[i], v: Object.fromEntries(CODES.map(c => [c, n[c][i] * SUNIT])), total: n.total[i] * SUNIT };
+    return { age: serAges[i], v: Object.fromEntries(CODES.map(c => [c, n[c][i] * SU()])), total: n.total[i] * SU() };
   }
   const fmtV = v => isQ() ? fmtQ(v) : fmtA(v);
   const unit = () => isQ() ? "mSv" : "‰";
@@ -491,7 +501,7 @@ const DATA = /*__DATA__*/null;
       svgc.attr("aria-label", `Regional meltwater discharge, ${f.label}`);
     } else {
       const n = serNode(); ages = serAges;
-      rows = ages.map((a, i) => Object.assign({ age: a }, Object.fromEntries(STACK.map(c => [c, n[c][i] * SUNIT]))));
+      rows = ages.map((a, i) => Object.assign({ age: a }, Object.fromEntries(STACK.map(c => [c, n[c][i] * SU()]))));
       svgc.attr("aria-label", `δ18O anomaly at ${state.site} by source region, ${DATA.forcings[state.forcing].label}, ${DATA.pathways[state.pathway].label}`);
     }
     const curve = isQ() ? d3.curveStepAfter : d3.curveLinear;
@@ -501,7 +511,7 @@ const DATA = /*__DATA__*/null;
     } else {
       const st = d3.stack().keys(STACK).offset(d3.stackOffsetDiverging)(rows);
       let ext = d3.extent(st.flat(2));
-      if (!isQ()) PATHWAYS.forEach(pw => { const t = serNode(pw).total; ext = d3.extent([...ext, ...d3.extent(t).map(v => v * SUNIT)]); });
+      if (!isQ()) PATHWAYS.forEach(pw => { const t = serNode(pw).total; ext = d3.extent([...ext, ...d3.extent(t).map(v => v * SU())]); });
       y = d3.scaleLinear().domain(ext).nice().range([plotB, m.t]);
       rows._st = st;
     }
@@ -545,8 +555,8 @@ const DATA = /*__DATA__*/null;
           const t = serNode(pw).total, own = pw === state.pathway;
           svgc.append("path").datum(t).attr("fill", "none").attr("stroke", css(own ? "--fg" : "--fg-2")).attr("stroke-width", own ? 1.6 : 1.1)
             .attr("stroke-dasharray", own ? null : (pw === "cold" ? "5 3" : "1.5 2.5"))
-            .attr("d", d3.line().x((v, i) => x(serAges[i])).y(v => y(v * SUNIT)));
-          ends.push({ pw, y: y(t[t.length - 1] * SUNIT) + 3 });
+            .attr("d", d3.line().x((v, i) => x(serAges[i])).y(v => y(v * SU())));
+          ends.push({ pw, y: y(t[t.length - 1] * SU()) + 3 });
         });
         // Keep the end labels at least 12 px apart, in value order.
         ends.sort((a, b) => a.y - b.y);
@@ -640,7 +650,7 @@ const DATA = /*__DATA__*/null;
   function drawFooter() {
     const f = $("footer"); f.replaceChildren();
     const lines = [
-      "Method: the decadal source-region δ¹⁸O anomaly of each forcing (−35 ‰ end-member; the forcing of Endres et al., in prep.) is convolved with the HadCM3 surface response to a 10-yr dye pulse in each region, A(t) = Σₖ F(t − k) · h(k). The 50 decadal responses add up to the constant-input equilibrium, so a steady forcing reaches the site weights of Endres et al. (2026b). The mixed pathway switches the AMOC mode on a fixed schedule; water released under one mode keeps spreading after a switch.",
+      `Method: the decadal source-region δ¹⁸O anomaly of each forcing (−35 ‰ end-member; the forcing of Endres et al., in prep.) is convolved with the HadCM3 surface response to a 10-yr dye pulse in each region, A(t) = Σₖ ${state.factor !== 1 ? state.factor + " · " : ""}F(t − k) · h(k).${state.factor !== 1 ? " The factor " + state.factor + " (one decade of a per-year forcing, as in the 2025.05 notebook) is under review: the 50 decadal responses already add up to the constant-input equilibrium, so a steady forcing gives " + state.factor + "× the site weights of Endres et al. (2026b)." : " The 50 decadal responses add up to the constant-input equilibrium, so a steady forcing reaches the site weights of Endres et al. (2026b)."} The mixed pathway switches the AMOC mode on a fixed schedule; water released under one mode keeps spreading after a switch.`,
       "Pulse runs: xpran (cold), xprao (zonal), xpujc (meridional), each after 10 yr of its constant-input parent run. The meridional pulse branches from xpram, not from the paper's meridional run xpral; it is used only in the mixed pathway, 14.7–13.7 ka.",
       `Kernels: ${DATA.kernels}. Built from pipeline commit ${DATA.run.git_commit || "?"} on ${DATA.run.created || "?"}. Regions and sites: Endres et al. (2026b). Coastline: Natural Earth 110 m.`,
     ];
@@ -656,8 +666,12 @@ const DATA = /*__DATA__*/null;
     document.querySelectorAll("[data-forcing]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.forcing === state.forcing)));
     document.querySelectorAll("[data-pathway]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pathway === state.pathway)));
     document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === state.view)));
+    document.querySelectorAll("[data-factor]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.factor) === state.factor)));
   }
   makeSeg("forcing-seg", FORCINGS, k => DATA.forcings[k].label, "forcing");
+  { const host = $("factor-seg");
+    FACTORS.forEach(k => { const b = el("button", "", "×" + k); b.type = "button"; b.dataset.factor = k;
+      b.addEventListener("click", () => { state.factor = k; syncSegs(); renderAll(); }); host.append(b); }); }
   makeSeg("pathway-seg", PATHWAYS, k => ({ cold: "Cold", zonal: "Zonal", mixed: "Mixed" })[k] || k, "pathway");
   const siteSel = $("site");
   SITES.forEach(s => { const o = el("option", "", `${s.name} · ${s.type.toLowerCase()}`); o.value = s.name; siteSel.append(o); });
@@ -717,10 +731,11 @@ const DATA = /*__DATA__*/null;
 
   function start(saved) {
     const s = saved || {};
-    ["forcing", "pathway", "site", "age", "sel", "table", "speed", "howto", "view"].forEach(k => { if (s[k] !== undefined) state[k] = s[k]; });
+    ["forcing", "pathway", "site", "age", "sel", "table", "speed", "howto", "view", "factor"].forEach(k => { if (s[k] !== undefined) state[k] = s[k]; });
     if (!FORCINGS.includes(state.forcing)) state.forcing = FORCINGS[0];
     if (!PATHWAYS.includes(state.pathway)) state.pathway = PATHWAYS[0];
     if (state.view !== "diff") state.view = "anomaly";
+    if (!FACTORS.includes(state.factor)) state.factor = FACTORS[0];
     if (state.site !== DISCHARGE && !SITES.some(x => x.name === state.site)) state.site = SITES[0].name;
     state.playing = false; state.age = clampAge(state.age);
     syncSegs(); siteSel.value = state.site; $("speed").value = String(state.speed); slider.value = -state.age;

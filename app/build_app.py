@@ -119,6 +119,11 @@ def build():
     payload = {
         "placeholder": bool(info["placeholder"]),
         "kernels": info["kernels"],
+        "scale": info.get("scale", 1),
+        # Forcing factors offered in the app. The pipeline runs at x1; the model is linear, so
+        # x10 (the 2025.05 notebook's factor, UNDER REVIEW) is applied in the page.
+        "factors": [1, 10],
+        "factor_default": 10,
         "run": {"created": info.get("created"), "git_commit": info.get("git_commit")},
         "regions": regions,
         "geo": {"type": "FeatureCollection", "features": geo["features"]},

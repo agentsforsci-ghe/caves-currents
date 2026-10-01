@@ -69,7 +69,7 @@ Consequences:
 - **Scaling.** The 50 decadal responses add up to the constant-input equilibrium:
   - Cold and zonal, per site (weighted over regions): 0.85–1.16 against `data/meltmodel_site_weights.csv`.
   - Over the North Atlantic box: 1.00 (cold) and 1.02 (zonal).
-  - So the convolution uses **no ×10**, which the 2025.05 notebook's deglacial cells did use. Decided with Laura.
+  - So with no extra factor, a steady forcing reaches the paper's equilibrium weights. The 2025.05 notebook's deglacial cells multiplied the forcing by 10. The pipeline runs at ×1, and the explorer can switch to ×10. **Which factor is right is under review** (see "Open questions" in CLAUDE.md).
 - **Merid.** Against the paper's `mean_dye_merid.nc`, the ratio is 1.08 over the North Atlantic box but 0.49 (PS2644-5) to 1.16 at single sites. This fits the xpram parent (see the caveat above).
 - **Notebook cross-check** (`notebook_point_kernels.nc`):
   - PS2644-5, cold and zonal: identical to the notebook (r = 1.000, amplitude 1.00).
