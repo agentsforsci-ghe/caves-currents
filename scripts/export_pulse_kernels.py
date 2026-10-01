@@ -337,7 +337,8 @@ def main():
             NOTEBOOK_PICKLES[k] = args.notebook_dir / p.relative_to(NOTEBOOK_DIR)
 
     print("Pulse fields:")
-    OUTDIR.mkdir(parents=True, exist_ok=True)
+    if not args.dry_run:                       # a dry run writes nothing
+        OUTDIR.mkdir(parents=True, exist_ok=True)
     written = [export_fields(dry_run=args.dry_run)]
     if args.dry_run:
         return

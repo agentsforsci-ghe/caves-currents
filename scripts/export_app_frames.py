@@ -15,7 +15,7 @@ Reads outputs/convolution[/placeholder]/fields/field_<forcing>_<pathway>.nc
 
 Only ocean cells with a value at every frame are kept. Each byte encodes the
 freshening magnitude |min(A, 0)| on one logarithmic scale shared by all
-files, so the six combinations compare directly:
+files, so all forcings and pathways compare directly:
 
     q = 0                          |A| < VMIN (and the rare, tiny A > 0)
     q = 1 + round(254 * log(|A|/VMIN) / log(VMAX/VMIN)),  capped at 255
