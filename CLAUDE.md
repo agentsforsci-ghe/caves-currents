@@ -11,13 +11,26 @@ is Laura Endres.
 |---|---|---|
 | 1 | Age range of Glas | `glas_age_range.qmd` / `.docx` |
 | 2 | Most important and most variable meltwater source at NISA; alignment of abrupt Glas δ¹⁸O shifts with discharge | `nisa_meltwater_sources.qmd` / `.docx`, plus the explorer in `app/` |
+| 2 (v2) | Source-region contributions at the nine proxy sites from the forward-model convolution, with spider figures and a plain-language explanation of the five metrics | `site_anomalies_v2.qmd` / `.docx` (about 10 s to render) |
 | 3 | Age range of the Lake Gerzensee record | Open. No Gerzensee data is in `data/` yet |
 
 ## Layout
 
 - `data/`: SISAL-format database excerpt (schema in `data/schema.dbml`), the two regional discharge series, and `meltmodel_site_weights.csv` (with provenance in `meltmodel_site_weights.md`).
 - `*.qmd` and `*.docx` at the root: one manuscript per question. The DOCX is committed alongside its source.
-- `app/`: Meltwater Discharge Explorer, an interactive map and time series of the discharge. See `app/README.md`.
+- `app/`: Meltwater Discharge Explorer, an interactive map and time series of the discharge. See `app/README.md`. `regions_hadcm3.geojson` holds the exact HadCM3 input regions (made by `scripts/make_region_geojson.py`).
+- **Convolution pipeline (v2)**, laid out like the meltmodel repo:
+  - `myconfig/`: dyes and colours, sites, forcings, pathways and paths.
+  - `mymodules/`: the forcing loader, site extraction, kernels and the convolution.
+  - `scripts/`: `export_pulse_kernels.py` (runs on the Leeds server), `make_uptake_weights.py`, `make_region_geojson.py` and `run_convolution.py`.
+  - Outputs go to `outputs/convolution/`. That folder is **not in git**; rebuild it with `run_convolution.py`.
+  - New forcings are one entry in `myconfig/FORCINGS.py`, and new sites one entry in `myconfig/SITES.py`.
+- `R/site_metrics.R`: reusable R helpers for any report. They read `outputs/convolution/site_anomaly.csv.gz`, average it onto a 500-yr grid, compute the five metrics (share, dominance, SD, variance share, SD of changes) and draw one site's spider figure.
+- `data/kernels/`: the HadCM3 pulse-kernel bundle. It is **untracked** (see its README for how to make it). `data/meltmodel/uptake_weights.nc` holds the land-site moisture-uptake fields regridded from the trajectories.
+- **Not in git** (Laura, 2026-10-01): `data/kernels/` (except its README), `data/meltmodel/` and `outputs/`. They are generated model data.
+  - A fresh clone rebuilds them with `make_uptake_weights.py` (needs the meltmodel repo data) and `run_convolution.py` (needs the kernel bundle from Leeds).
+  - `site_anomalies_v2.qmd`, the app build and the slide generator need these outputs. The rendered `site_anomalies_v2.docx` and `app/discharge_explorer.html` are committed.
+  - Never commit these files, and never add them back with `git add -f`.
 - `plans/`: plans written before large tasks, dated.
 - `prompts/`: verbatim prompt archive written by the commit skill (`YYYY-MM-DD-NNN-slug.md`).
 - `Impulse_Response_Revisions_v1.pdf`: unpublished forward-model draft (Endres et al., in prep.). It is deliberately **untracked**, so never commit it. The same goes for Word lock files (`~$*.docx`).
@@ -38,6 +51,21 @@ After a render, read the text back to check every inline value and claim:
 pandoc nisa_meltwater_sources.docx -t plain --wrap=none
 ```
 
+Convolution pipeline (needs the conda `base` Python with xarray and scipy; about 30 s):
+
+```sh
+python3 scripts/make_uptake_weights.py      # once: trajectories -> data/meltmodel/uptake_weights.nc
+python3 scripts/make_region_geojson.py      # once: HadCM3 input cells -> app/regions_hadcm3.geojson
+python3 scripts/run_convolution.py          # uses data/kernels/ if present, else the placeholder
+python3 scripts/validate_constant_forcing.py   # 500-yr constant forcing vs the paper's site anomalies (ratio about 1)
+python3 scripts/export_app_frames.py        # decadal fields -> app/frames/ (8-bit, gzip+base64 text, about 1.5-2.3 MB per file)
+python3 scripts/make_forward_model_schematic.py --out <path>   # standalone forward-model schematic (also inlined in the app)
+python3 scripts/make_spider_slides.py --out <folder>          # the three spider slides (needs Rscript)
+/Applications/RStudio.app/Contents/Resources/app/quarto/bin/quarto render site_anomalies_v2.qmd   # about 10 s
+```
+
+Without the kernel bundle, `run_convolution.py` falls back to a **placeholder**: the equilibrium field spread over time with an invented 100-yr response time. Its outputs go to `outputs/convolution/placeholder/`, which is gitignored. Never report, commit or publish them as results.
+
 R 4.6 is installed with readr, dplyr, tidyr, purrr, ggplot2, patchwork, strucchange, Bchron, zoo, boot and knitr. **Not** installed: changepoint, flextable and kableExtra. Tables use `knitr::kable()`. The app build uses only the Python standard library.
 
 ## Data conventions
@@ -46,8 +74,22 @@ R 4.6 is installed with readr, dplyr, tidyr, purrr, ggplot2, patchwork, struccha
 - **Discharge files.** Time runs forward in model years: negate `time` (GLAC-1D, 100-yr steps) or `t_adj` (ICE-6G, 500-yr steps) to get yr BP. As a sanity check, total discharge peaks at Meltwater Pulse 1A: 0.260 Sv at 14.4 ka and 0.243 Sv at 14.0 ka.
 - **Region codes** in file order are `Med, Bri, Fen, EurArc, AmeArc, GIS, NLau, SLau, GulofMex`. They map one to one onto Endres et al. (2026b) names: `EIS_MedSea, EIS_BayOfBiscay, EIS_NorwegianSea, EIS_Arctic, LAU_Arctic, GIS_GreenlandSea, LAU_LabradorSea, LAU_StLawrence, LAU_GulfOfMexico`. `LAU_Arctic` drains to the Beaufort Sea.
 - **Anomaly columns** (`<code> d18O (-30/-35/-40)`) hold the *source-region* δ¹⁸O anomaly, which is linear in discharge. They are the forcing that the forward-model draft convolves, not the anomaly at NISA. Use the −35 ‰ end-member; the others only rescale everything by 6/7 or 8/7. Endres et al. (2026b) use a saturating mixing fraction instead, so their scenario values are smaller for large pulses.
-- **Site anomalies.** Multiply source anomalies by `meltmodel_site_weights.csv` (site × region × AMOC mode, cold or zonal). This is an *equilibrium* approximation: it has no transit delay and overstates short pulses, so always say so. The real impulse-response kernels and the convolved NISA series are not available.
+- **Site anomalies (v1).** Multiply source anomalies by `meltmodel_site_weights.csv` (site × region × AMOC mode, cold or zonal). This is an *equilibrium* approximation: it has no transit delay and overstates short pulses, so always say so.
+- **Site anomalies (v2).** Convolve the decadal forcing with the pulse kernels: `A(t) = Σ_k F(t−k)·h(k)`, with **no extra factor**. This is validated against the meltmodel paper; see "Resolved questions" below.
+  - The pulse runs are xpran (cold), xprao (zonal) and xpujc (merid). Each starts after its 10-yr pulse, so the export prepends the parent run's first 10 yr (xpraj, xprak, xpram). xpram was confirmed from the time axes: it starts in 4511 and xpujc in 4521. xpram is **not** the paper's merid run (xpral), so the merid kernel has a different parent climate. The merid kernel only affects the mixed pathway, at 14.7–13.7 ka; mention this whenever you use it (see `data/kernels/README.md`).
+  - The mixed pathway switches modes on the notebook's schedule. Its first and last modes extend to the ends of the forcing, which gives a spin-up.
+  - Land sites use the trajectory uptake fields. The merid segment borrows the zonal uptake, because there is no merid trajectory run.
+  - `scaling_check.csv` compares the 500-yr step response with the equilibrium weights, and should be about 1.
 - **Published abrupt Glas events** (Endres et al. 2026a, Table 1) are hard-coded in both `nisa_meltwater_sources.qmd` and `app/build_app.py`. Define events by sample **depth**, so that they are re-dated in every age-model ensemble member.
+
+## Resolved questions
+
+- **Forcing factor: ×1** (Laura, 2026-10-01). `scripts/validate_constant_forcing.py` holds each region's paper source anomaly constant for 500 yr and runs it through the pipeline's convolution.
+  - **×1** reproduces the meltmodel paper's site anomalies (`proxymag.pkl`): median ratio 0.98 over 4 scenarios × 2 modes × 9 sites, and 18.2 ka cold within 0.96–1.02.
+  - **×10** gives ten times the paper's values.
+  - The 2025.05 notebook's ×10 double-counted the 10 pulse years.
+  - **Remaining scatter** has a known cause: the kernels come from the 17.8 ka runs, while the paper's 19.4 and 20.7 ka sites use those time slices' own fields. Zonal 18.2 ka at PS2644-5 and MD03-2664 is 1.5×.
+  - The app can show a factor switch again by adding 10 to `factors` in `app/build_app.py`.
 
 ## Analysis standards (question 2)
 
@@ -70,7 +112,13 @@ The design was reviewed from Kira Rehfeld's perspective: irregular, age-uncertai
 
 ## Colours
 
-The region colours match the paper figures (matplotlib tab10), with lightness tuned to pass colour-blindness checks. They are defined in **two places that must stay in sync**: `reg_col` in `nisa_meltwater_sources.qmd` and the `--r-*` tokens in `app/template.html`.
+The region colours match the paper figures (matplotlib tab10), with lightness tuned to pass colour-blindness checks. They are defined in **four places that must stay in sync**:
+- `reg_col` in `nisa_meltwater_sources.qmd`;
+- `reg_col` in `R/site_metrics.R`, used by `site_anomalies_v2.qmd`;
+- the `--r-*` tokens in `app/template.html`;
+- `TOKENS_CSS` in `scripts/make_forward_model_schematic.py`.
+
+`myconfig/DYES.py` also lists them for the Python side. The two reconstructions have their own pair: GLAC-1D `#184f95` and ICE-6G `#c26a00`, in the report and the slides.
 
 | Region | Light | Dark (app only) |
 |---|---|---|
@@ -89,9 +137,21 @@ Stacked charts use this bottom-to-top order, which keeps neighbouring colours di
 ## Explorer app
 
 - `discharge_explorer.html` is generated, so edit `template.html` or `build_app.py` and rebuild.
-- `regions_approx.geojson` holds hand-digitised, approximate outlines from Endres et al. (2026b, Fig. 2a). Exact HadCM3 masks with the same `code` property can replace it without code changes.
+- **v2** reads the pipeline outputs. The map frames are fetched from `app/frames/`, so test over http, not `file://`. `build_app.py --publish-out` refuses placeholder outputs, and a page built from them must not be committed. Publish all nine `frames/*.txt` (six anomaly files, one per forcing and pathway, and three GLAC-1D − ICE-6G difference files, one per pathway) as artifact `files`. They are gzip + base64 text, because artifacts reject binary.
+- The "How the model works" panel is `scripts/make_forward_model_schematic.py`, inlined by `build_app.py`. Its classes and SVG ids carry an `fm-` prefix, so it can't clash with the app's styles. Keep it that way. Its standalone copy is https://claude.ai/artifact/CqfLtTKp2MCwDi9L8YFa6x; republish the `--out` file to the same URL. Only the forcing panel shows real data. The kernels are in, so the pulse-response curves (step 2) could now use the real NISA responses.
+- **Globe colour maps** (Laura's choice, 2026-09-30):
+  - Crameri `hawaii` for anomaly size and `vik` for the GLAC-1D − ICE-6G difference view.
+  - The stops are sampled from `cmcrameri` in the `dyetracer` conda env and stored as `--cm-*` / `--dv-*` tokens.
+  - These are field colours, separate from the region palette.
+- In the Chrome automation tab, `requestAnimationFrame` does not run, because the tab reports itself as hidden. To test playback there, replace it with a `setTimeout` stand-in.
+- The globe draws `regions_hadcm3.geojson`, the exact HadCM3 input cells. `regions_approx.geojson`, the v1 hand-digitised outlines, is now only read for region names and drainage notes.
 - The shared page is https://claude.ai/artifact/HMQMC2ACsbpvvDQNyRgcPG, which is private until shared. Republish the `--publish-out` copy to the same URL to keep the link.
 - The browser tools cannot open `file://`. To test locally, serve the folder with `python3 -m http.server 8765 --bind 127.0.0.1` from `app/` and stop the server afterwards.
+
+## Slides
+
+- The spider slides are the Slides-type artifact https://claude.ai/artifact/TeDmKyFH5oj1oW9dpwhAEW (private until shared; downloads as PowerPoint or PDF). There are three slides: how to read a spider, the nine NISA spiders, and the takeaways.
+- `scripts/make_spider_slides.py` writes them from the convolution outputs through `R/site_metrics.R`, so the numbers follow the data. To update the deck, republish the three `project/slides/*.html` files to the same URL with `root` set to the `--out` folder. Leave `deck.json` alone unless slides are added or removed (`--index`).
 
 ## Git workflow
 

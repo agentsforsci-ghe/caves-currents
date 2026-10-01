@@ -1,2 +1,15 @@
 .DS_Store
 .Rproj.user
+
+# Pulse-kernel bundle exported on the Leeds server (large; see data/kernels/README.md)
+data/kernels/*
+!data/kernels/README.md
+
+# Generated model data stays out of git (Laura, 2026-10-01). Rebuild with
+# scripts/make_uptake_weights.py and scripts/run_convolution.py (see README.md).
+data/meltmodel/
+outputs/
+__pycache__/
+
+# Generated app frames (large; rebuilt by scripts/export_app_frames.py)
+app/frames/
