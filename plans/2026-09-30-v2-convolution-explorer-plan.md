@@ -130,7 +130,7 @@ Where the build differs from the plan above:
   - The runs carry an extra `dye09` tracer, which is ignored.
 - **Step 2.**
   - **Scaling check.** The 50 decadal responses add up to the equilibrium: 0.85–1.16 per site for cold and zonal.
-  - **The ×10 factor is open.** The pipeline runs at ×1, and whether the notebook's ×10 is right is **under review**. See "Open questions" in CLAUDE.md.
+  - **The ×10 factor is resolved: ×1.** A 500-yr constant forcing reproduces the paper's site anomalies (median ratio 0.98, `scripts/validate_constant_forcing.py`). See "Resolved questions" in CLAUDE.md.
   - **Cross-check.** PS2644-5 matches the notebook exactly. NISA is 1.4–1.7× larger, because it now uses the trajectory uptake masks.
 - **Step 3.**
   - Map frames ship as gzip + base64 `.txt` (about 2 MB each), because artifacts reject binary files.
@@ -138,7 +138,7 @@ Where the build differs from the plan above:
     - a GLAC-1D − ICE-6G difference view;
     - Crameri `hawaii` and `vik` colour maps;
     - a "How the model works" panel (`scripts/make_forward_model_schematic.py`);
-    - a ×1 | ×10 forcing-factor switch, default ×10.
+    - a ×1 | ×10 forcing-factor switch, then set to ×1 only after the validation.
   - Live at https://claude.ai/artifact/HMQMC2ACsbpvvDQNyRgcPG.
 - **Step 4.**
   - `site_anomalies_v2.qmd` has one spider figure per site, the mixed pathway only, and a table for the pathway sensitivity.

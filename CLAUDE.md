@@ -53,6 +53,7 @@ Convolution pipeline (needs the conda `base` Python with xarray and scipy; about
 python3 scripts/make_uptake_weights.py      # once: trajectories -> data/meltmodel/uptake_weights.nc
 python3 scripts/make_region_geojson.py      # once: HadCM3 input cells -> app/regions_hadcm3.geojson
 python3 scripts/run_convolution.py          # uses data/kernels/ if present, else the placeholder
+python3 scripts/validate_constant_forcing.py   # 500-yr constant forcing vs the paper's site anomalies (ratio about 1)
 python3 scripts/export_app_frames.py        # decadal fields -> app/frames/ (8-bit, gzip+base64 text, about 1.5-2.3 MB per file)
 python3 scripts/make_forward_model_schematic.py --out <path>   # standalone forward-model schematic (also inlined in the app)
 python3 scripts/make_spider_slides.py --out <folder>          # the three spider slides (needs Rscript)
@@ -70,27 +71,21 @@ R 4.6 is installed with readr, dplyr, tidyr, purrr, ggplot2, patchwork, struccha
 - **Region codes** in file order are `Med, Bri, Fen, EurArc, AmeArc, GIS, NLau, SLau, GulofMex`. They map one to one onto Endres et al. (2026b) names: `EIS_MedSea, EIS_BayOfBiscay, EIS_NorwegianSea, EIS_Arctic, LAU_Arctic, GIS_GreenlandSea, LAU_LabradorSea, LAU_StLawrence, LAU_GulfOfMexico`. `LAU_Arctic` drains to the Beaufort Sea.
 - **Anomaly columns** (`<code> d18O (-30/-35/-40)`) hold the *source-region* δ¹⁸O anomaly, which is linear in discharge. They are the forcing that the forward-model draft convolves, not the anomaly at NISA. Use the −35 ‰ end-member; the others only rescale everything by 6/7 or 8/7. Endres et al. (2026b) use a saturating mixing fraction instead, so their scenario values are smaller for large pulses.
 - **Site anomalies (v1).** Multiply source anomalies by `meltmodel_site_weights.csv` (site × region × AMOC mode, cold or zonal). This is an *equilibrium* approximation: it has no transit delay and overstates short pulses, so always say so.
-- **Site anomalies (v2).** Convolve the decadal forcing with the pulse kernels: `A(t) = Σ_k c·F(t−k)·h(k)`.
-  - **Pipeline and reports:** c = 1.
-  - **Explorer:** a switch between ×1 and ×10, default ×10. The model is linear, so the page applies the factor exactly.
-  - **The factor is an open question; see "Open questions" below.**
+- **Site anomalies (v2).** Convolve the decadal forcing with the pulse kernels: `A(t) = Σ_k F(t−k)·h(k)`, with **no extra factor**. This is validated against the meltmodel paper; see "Resolved questions" below.
   - The pulse runs are xpran (cold), xprao (zonal) and xpujc (merid). Each starts after its 10-yr pulse, so the export prepends the parent run's first 10 yr (xpraj, xprak, xpram). xpram was confirmed from the time axes: it starts in 4511 and xpujc in 4521. xpram is **not** the paper's merid run (xpral), so the merid kernel has a different parent climate. The merid kernel only affects the mixed pathway, at 14.7–13.7 ka; mention this whenever you use it (see `data/kernels/README.md`).
   - The mixed pathway switches modes on the notebook's schedule. Its first and last modes extend to the ends of the forcing, which gives a spin-up.
   - Land sites use the trajectory uptake fields. The merid segment borrows the zonal uptake, because there is no merid trajectory run.
   - `scaling_check.csv` compares the 500-yr step response with the equilibrium weights, and should be about 1.
 - **Published abrupt Glas events** (Endres et al. 2026a, Table 1) are hard-coded in both `nisa_meltwater_sources.qmd` and `app/build_app.py`. Define events by sample **depth**, so that they are re-dated in every age-model ensemble member.
 
-## Open questions
+## Resolved questions
 
-- **The forcing factor (×1 or ×10) needs a detailed review** (raised 2026-10-01).
-  - **For ×10:** the 2025.05 notebook used it, and Laura's reasoning is that the forcing is entered per year while the pulse was 10 years at 1 normalised unit per year.
-  - **Against:**
-    - The 50 decadal pulse responses already add up to the constant-input equilibrium: 0.85–1.16 per site for cold and zonal, and the notebook's own constant runs agree.
-    - The source-region dye decays smoothly from the parent's pulse decade into the pulse run, with no 10× jump.
-    - With ×10, the surface anomaly near the sources reaches about −44 ‰, more negative than the −35 ‰ meltwater end-member itself. With ×1 the maximum is about −4.4 ‰.
-  - **What does not depend on the factor:** shares, dominance, variance shares and the spider shapes.
-  - **What scales with it:** anomaly values, SDs and the map colours.
-  - The pipeline (`--scale`), the explorer switch and `mymodules/convolution.py` all document this.
+- **Forcing factor: ×1** (Laura, 2026-10-01). `scripts/validate_constant_forcing.py` holds each region's paper source anomaly constant for 500 yr and runs it through the pipeline's convolution.
+  - **×1** reproduces the meltmodel paper's site anomalies (`proxymag.pkl`): median ratio 0.98 over 4 scenarios × 2 modes × 9 sites, and 18.2 ka cold within 0.96–1.02.
+  - **×10** gives ten times the paper's values.
+  - The 2025.05 notebook's ×10 double-counted the 10 pulse years.
+  - **Remaining scatter** has a known cause: the kernels come from the 17.8 ka runs, while the paper's 19.4 and 20.7 ka sites use those time slices' own fields. Zonal 18.2 ka at PS2644-5 and MD03-2664 is 1.5×.
+  - The app can show a factor switch again by adding 10 to `factors` in `app/build_app.py`.
 
 ## Analysis standards (question 2)
 

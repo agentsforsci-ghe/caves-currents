@@ -378,10 +378,10 @@ def body():
     s = scale_factor()
     sc = f"{s:g} · " if s != 1 else ""
     note = (f" The forcing is multiplied by {s:g} (one decade of a per-year forcing, as in the 2025.05 notebook); "
-            "this factor is under review, because the 50 decadal responses already add up to the equilibrium."
+            "a forcing held constant for 500 years gives that many times the paper's site anomalies, so the factor is not the model's."
             if s != 1 else
-            " The explorer can also multiply the forcing by 10 (one decade of a per-year forcing, as in the 2025.05 "
-            "notebook); that factor is under review, because the 50 decadal responses already add up to the equilibrium.")
+            " A forcing held constant for 500 years reproduces the site anomalies of Endres et al. (2026b) "
+            "(median ratio 0.98, scripts/validate_constant_forcing.py), so no extra factor is applied.")
     return f"""<div class="stages">
     <figure class="stage">
       <h2><span class="n">1</span>Forcing</h2>

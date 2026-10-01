@@ -26,6 +26,7 @@ g    <- to_grid(d, step = 500, window = win)
 m    <- site_metrics(g)
 info <- fromJSON("outputs/convolution/run_info.json")
 chk  <- read_csv("outputs/convolution/scaling_check.csv", show_col_types = FALSE)
+val  <- read_csv("outputs/convolution/validation_constant_forcing.csv", show_col_types = FALSE)
 
 sites <- c("La Vallina (NISA)", "Cave Without a Name", "NGRIP", "MD95-2010", "PS2644-5",
            "MD03-2664", "ODP980", "MD95-2042", "MD02-2552")
@@ -148,8 +149,18 @@ response to the equilibrium weights of Endres et al. (2026b) lies between
 `r fmt(min(w_site$r))` and `r fmt(max(w_site$r))` for the cold and zonal
 modes (median over all site, mode and region cells
 `r fmt(median(chk$ratio, na.rm = TRUE))`). A constant forcing therefore
-reaches the paper's equilibrium anomaly. What the forward model changes is
-the timing: short pulses arrive later and more spread out.
+reaches the paper's equilibrium anomaly. As a direct test, each region's
+source anomaly of the paper's four scenarios was held constant for 500 years
+and run through the convolution. The resulting site anomalies agree with the
+paper's (median ratio `r fmt(median(val$ratio_x1))`, 5–95 % range
+`r fmt(quantile(val$ratio_x1, 0.05))`–`r fmt(quantile(val$ratio_x1, 0.95))`). Most of the
+scatter is expected: the pulse responses come from the 17.8 ka simulations,
+while the paper's 19.4 and 20.7 ka site values use those time slices' own
+ocean states.
+This is why the forcing gets no extra factor; the 2025.05 convolution
+notebook multiplied it by 10, which gives `r fmt(median(val$ratio_x10), 1)`
+times the paper's values. What the forward model changes is the timing:
+short pulses arrive later and more spread out.
 
 **Metrics.** The decadal site series were averaged into
 `r length(unique(g$age))` steps of 500 years between 21.5 and 10 ka. This is
@@ -297,10 +308,6 @@ spider_plot(m, "MD02-2552")
 - **Land sites.** NISA is weighted by the trajectory uptake masks. The 2025.05
   convolution notebook used a different moisture-source field, which gave a
   smaller NISA anomaly with the same timing.
-- **Forcing factor.** This report uses the forcing as it is (factor 1). The
-  2025.05 convolution notebook multiplied it by 10, and which factor is right
-  is under review. Shares, dominance, variance shares and the spider shapes
-  are the same under both; anomaly values and SDs would be ten times larger.
 - **Metrics.** The numbers describe the forward model, not the proxy
   records. Spokes are scaled per site, so a large polygon at one site cannot
   be compared in absolute terms with a large polygon at another.

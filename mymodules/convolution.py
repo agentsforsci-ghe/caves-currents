@@ -5,14 +5,13 @@ decadal kernel h is
 
     A(t) = sum_k c * F(t - k) * h(k)
 
-The pipeline runs with c = SCALE = 1. The 2025.05 convolution notebook used
-c = 10, with the reasoning that the dye pulse was 10 years at 1 normalised
-unit per year and F is a per-year source anomaly. The model is linear, so the
-explorer offers both, and switches between them exactly by multiplying
-(default x10, Laura, 2026-10-01).
-
-TO REVIEW IN DETAIL (open, 2026-10-01). The kernel checks point the other
-way. The 50 decadal pulse responses already add up to the constant-input
+c = SCALE = 1. The 2025.05 convolution notebook used c = 10, reasoning that
+the dye pulse was 10 years at 1 normalised unit per year and F is a per-year
+source anomaly. RESOLVED 2026-10-01 in favour of c = 1: a forcing held
+constant for 500 yr reproduces the meltmodel paper's site anomalies with
+c = 1 (median ratio 0.98 over 4 scenarios x 2 modes x 9 sites) and gives ten
+times them with c = 10 (scripts/validate_constant_forcing.py). Laura's
+decision. Earlier evidence pointed the same way. The 50 decadal pulse responses already add up to the constant-input
 equilibrium: 0.85-1.16 per site for cold and zonal, and the notebook's own
 constant runs agree. The source-region dye also decays smoothly from the
 parent's pulse decade into the pulse run, with no 10x jump. With SCALE = 10,
@@ -35,7 +34,7 @@ from scipy.signal import fftconvolve
 
 from myconfig.PATHWAYS import PATHWAYS
 
-SCALE = 1.0   # factor on the decadal forcing in the pipeline; x10 is offered in the app; UNDER REVIEW, see above
+SCALE = 1.0   # no extra factor; validated against the meltmodel paper, see above
 
 
 def pathway_modes(t_model, pathway):

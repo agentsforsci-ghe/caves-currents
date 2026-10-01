@@ -41,9 +41,10 @@ These pages are private links that the owner can share:
 4. **Sites.** Ocean cores take a ±2° box mean. Caves and the ice core weight the
    field by the moisture uptake of their rain, from back-trajectories.
 
-**Open question:** should the forcing be multiplied by 10, as in the 2025.05
-notebook? The pipeline and reports use ×1, and the explorer can switch to ×10.
-See "Open questions" in `CLAUDE.md`.
+**Validation.** A forcing held constant for 500 years reproduces the meltmodel
+paper's site anomalies (median ratio 0.98, `scripts/validate_constant_forcing.py`).
+So the forcing gets no extra factor; the 2025.05 notebook's ×10 double-counted
+the 10 pulse years.
 
 ## Running it
 

@@ -83,7 +83,7 @@ def main():
     ap.add_argument("--pathway", nargs="+", default=list(PATHWAYS))
     ap.add_argument("--no-fields", action="store_true", help="skip the surface fields")
     ap.add_argument("--scale", type=float, default=SCALE,
-                    help=f"factor on the decadal forcing (default {SCALE:g}; under review, see mymodules/convolution.py)")
+                    help=f"factor on the decadal forcing (default {SCALE:g}; validated, see mymodules/convolution.py)")
     ap.add_argument("--field-window", nargs=2, type=int, default=[23000, 9000],
                     metavar=("OLDEST_BP", "YOUNGEST_BP"), help="years BP kept in the field files")
     args = ap.parse_args()
