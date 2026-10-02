@@ -40,6 +40,7 @@ sys.path.insert(0, str(ROOT))
 from myconfig.DYES import CODE_TO_REGION, CODES
 from myconfig.FORCINGS import FORCINGS
 from myconfig.PATHS import FIELDS, OUTPUTS, SITE_WEIGHTS
+from myconfig.PATHS import ROOT as PATHS_ROOT  # data root; differs from ROOT when another repo installs the pipeline
 from myconfig.PATHWAYS import FIELD_DOMAIN, PATHWAYS
 from myconfig.SITES import SITES
 from mymodules.convolution import SCALE, convolve_field, convolve_series
@@ -146,7 +147,7 @@ def main():
                                          "placeholder": int(kern.placeholder)})
                 path = fielddir / f"field_{fk}_{pw}.nc"
                 da.to_netcdf(path, encoding={"anomaly": {"zlib": True, "complevel": 4}})
-                field_files.append(str(path.relative_to(ROOT)))
+                field_files.append(str(path.relative_to(PATHS_ROOT)))
                 print(f"  field  {fk:7s} {pw:6s} {tot.shape} -> {path.name}")
 
     info = {
@@ -166,7 +167,7 @@ def main():
         "runtime_s": round(time.time() - t0, 1),
     }
     (outdir / "run_info.json").write_text(json.dumps(info, indent=2))
-    print(f"Done in {info['runtime_s']} s. Outputs in {outdir.relative_to(ROOT)}")
+    print(f"Done in {info['runtime_s']} s. Outputs in {outdir.relative_to(PATHS_ROOT)}")
 
 
 if __name__ == "__main__":

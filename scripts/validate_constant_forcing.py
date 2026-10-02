@@ -35,6 +35,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 from myconfig.DYES import CODES
 from myconfig.PATHS import MELTMODEL_DATA, OUTPUTS
+from myconfig.PATHS import ROOT as PATHS_ROOT  # data root; differs from ROOT when another repo installs the pipeline
 from myconfig.SITES import SITES
 from mymodules.convolution import convolve_series
 from mymodules.kernels import Kernels
@@ -71,7 +72,7 @@ def main():
                                             x1_max=("ratio_x1", "max"), x10_median=("ratio_x10", "median"))
     print(s.round(2).to_string())
     print(f"\nAll: factor 1 median ratio {d.ratio_x1.median():.2f}, factor 10 median ratio {d.ratio_x10.median():.2f}")
-    print(f"wrote {out.relative_to(ROOT)}")
+    print(f"wrote {out.relative_to(PATHS_ROOT)}")
 
 
 if __name__ == "__main__":

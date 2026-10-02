@@ -13,3 +13,6 @@ __pycache__/
 
 # Generated app frames (large; rebuilt by scripts/export_app_frames.py)
 app/frames/
+
+# Editable install metadata (pip install -e .)
+*.egg-info/
