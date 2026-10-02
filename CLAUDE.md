@@ -26,7 +26,7 @@ is Laura Endres.
   - Outputs go to `outputs/convolution/`. That folder is **not in git**; rebuild it with `run_convolution.py`.
   - New forcings are one entry in `myconfig/FORCINGS.py`, and new sites one entry in `myconfig/SITES.py`.
 - `R/site_metrics.R`: reusable R helpers for any report. They read `outputs/convolution/site_anomaly.csv.gz`, average it onto a 500-yr grid, compute the five metrics (share, dominance, SD, variance share, SD of changes) and draw one site's spider figure.
-- **Used by the paper.** The private paper repo `lrndrs/dyetracer_forwardmodel_paper` installs this pipeline (`pyproject.toml`, editable). `CAVES_CURRENTS_ROOT` points the data paths at a checkout. Keep the public API (`mymodules.*`, `myconfig.*`) stable, or update the paper with it.
+- **Copied into the paper.** The private paper repo `lrndrs/dyetracer_forwardmodel_paper` has its own copy of this pipeline since 2026-10-02 (Laura: self-contained, no link to caves-currents), so changes here do not reach it. Port fixes by hand when they matter for the paper. Both repos install `myconfig` and `mymodules` with `pip install -e .`, so only one of them can be installed at a time; the paper's install is the active one.
 - `data/kernels/`: the HadCM3 pulse-kernel bundle. It is **untracked** (see its README for how to make it). `data/meltmodel/uptake_weights.nc` holds the land-site moisture-uptake fields regridded from the trajectories.
 - **Not in git** (Laura, 2026-10-01): `data/kernels/` (except its README), `data/meltmodel/` and `outputs/`. They are generated model data.
   - A fresh clone rebuilds them with `make_uptake_weights.py` (needs the meltmodel repo data) and `run_convolution.py` (needs the kernel bundle from Leeds).
@@ -59,7 +59,7 @@ python3 scripts/make_uptake_weights.py      # once: trajectories -> data/meltmod
 python3 scripts/make_region_geojson.py      # once: HadCM3 input cells -> app/regions_hadcm3.geojson
 python3 scripts/run_convolution.py          # uses data/kernels/ if present, else the placeholder
 python3 scripts/validate_constant_forcing.py   # 500-yr constant forcing vs the paper's site anomalies (ratio about 1)
-pip install -e .                            # the pipeline as a package (myconfig, mymodules); used by the forward-model paper repo
+pip install -e .                            # the pipeline as a package (myconfig, mymodules); clashes with the paper repo's install of the same names
 python3 scripts/export_app_frames.py        # decadal fields -> app/frames/ (8-bit, gzip+base64 text, about 1.5-2.3 MB per file)
 python3 scripts/make_forward_model_schematic.py --out <path>   # standalone forward-model schematic (also inlined in the app)
 python3 scripts/make_spider_slides.py --out <folder>          # the three spider slides (needs Rscript)
