@@ -74,3 +74,12 @@ Consequences:
 - **Notebook cross-check** (`notebook_point_kernels.nc`):
   - PS2644-5, cold and zonal: identical to the notebook (r = 1.000, amplitude 1.00).
   - NISA: same shape (r ≈ 0.998), but 1.4× (cold) and 1.7× (zonal) larger. The notebook weighted NISA with `moisturesource.nc`, while v2 uses the trajectory uptake masks.
+
+## Validation inputs (second export)
+
+`scripts/export_validation_inputs.py` runs on the Leeds server next to `export_pulse_kernels.py`, and reuses its readers. It writes two files:
+
+- `constant_runs_surface.nc`: the surface dye of the 500-yr constant-input runs xpraj (cold), xprak (zonal), xpral (merid) and xpram (the merid pulse's parent), as decadal means. It feeds the spatial validation (RMSE maps) of the forward-model paper.
+- `amoc_poeppelmeier_25N.csv`: the AMOC strength at 25°N, averaged over 1000–1500 m, from the deglacial best fit of Pöppelmeier et al. (2023), as used in the 2025.05 notebook.
+
+Copy them into this folder as well. They are not in git.

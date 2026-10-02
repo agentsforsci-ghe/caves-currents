@@ -9,7 +9,9 @@ environment variable MELTMODEL_REPO to use another copy.
 import os
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+# The repository root. Other projects that install this pipeline (e.g. the
+# forward-model paper) can point it at a checkout with CAVES_CURRENTS_ROOT.
+ROOT = Path(os.environ.get("CAVES_CURRENTS_ROOT", Path(__file__).resolve().parents[1]))
 DATA = ROOT / "data"
 
 MELTMODEL_REPO = Path(os.environ.get(

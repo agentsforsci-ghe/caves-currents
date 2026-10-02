@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "caves-currents-pipeline"
+version = "0.3.0"
+description = "Convolution of meltwater forcings with HadCM3 dye-pulse responses, read at proxy sites (Endres et al.)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "All rights reserved until a licence is chosen" }
+authors = [{ name = "Laura Endres" }]
+dependencies = ["numpy", "pandas", "xarray", "scipy", "netCDF4"]
+
+[tool.setuptools]
+# The pipeline's two packages. Install editable (pip install -e .) so that
+# data/ and outputs/ resolve inside this repository, or set CAVES_CURRENTS_ROOT.
+packages = ["myconfig", "mymodules"]
